@@ -1,20 +1,8 @@
-# xa -M -DCSAVE -DCLOAD -l test.lbl lib/test.s
-# cut -d, -f1-2 test.lbl | sed -re 's/([^,]+), 0x(.+)$/\2 \1/' | sort > test.sym
-# cat ~/Oric/oricutron.git/roms/basic11b.sym test.sym | sort | uniq > ~/Oric/oricutron.git/roms/ROMCH376.sym
-
-
-# ---
-# source ~/devel/Python/python-2.7/bin/activate
-
-# cat PATCH-ROM3.bas
-# ./bin2data.sh ~/devel/GIT-WC/oric-gits/oric-ch376/asm/a.o65 > PATCH-ROM3.bas
-# vi PATCH-ROM3.bas 
-# txt2bas --input PATCH-ROM3.bas | bin2tap -t basic -o ../tapes/PATCH-ROM3.tap 
-
 PROJECT = basic_noram
 BUILDPATH = ../build/cart
 
 # %<-------------------------------------------------------------------------->%
+
 AS = xa
 ASFLAGS = -M -DCSAVE -DCLOAD -DNORAMCHECK
 
