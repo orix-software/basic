@@ -53,11 +53,10 @@
 ;---------------------------------------------------------------------------
 HIMEM_PTR       = $a6
 
-        *=$F3
-PTR  *=*+1
-PTR_MAX  *=*+1
-PTW  *=*+1
-PTW_MAX  *=*+1
+PTR             = $f3
+PTR_MAX         = $f4
+PTW             = $f5
+PTW_MAX         = $f6
 
 
 ;---------------------------------------------------------------------------
@@ -67,28 +66,17 @@ PTW_MAX  *=*+1
 ;---------------------------------------------------------------------------
 RAMSIZEFLAG     = $0220
 RAMFAULT        = $0260
+
 PAPER_VAL       = $026b
 INK_VAL         = $026c
+
+PROGNAME        = $027f
+
 HIMEM_MAX       = $02c1
 
-        *=$27F
-TNAME  *=*+17
-        *=$293
-TH_NAME  *=*+17
-TH_DUMMY  *=*+4
-TH_UNUSED  *=*+1
-TH_START  *=*+2
-	TH_START_L=TH_START
-	TH_START_H=TH_START+1
-TH_END  *=*+2
-	TH_END_L=TH_END
-	TH_END_H=TH_END+1
-TH_AUTO  *=*+1
-TH_TYPE  *=*+1
-TH_STRING_FLAG  *=*+1
-TH_INTEGER_FLAG  *=*+1
-TH_ERROR  *=*+1
-
+PROGSTART       = $02a9
+PROGEND         = $02ab
+PROGTYPE        = $02ae
 
 ;---------------------------------------------------------------------------
 ;
@@ -138,7 +126,7 @@ RESET_VECTOR    = $fffc
 	;---------------------------------------------------------------------------
 	new_patchl(WriteFileHeader,3)
 
-		-WriteFileHeader
+		-WriteFileHeader:
 			jmp OpenTapeWrite
 
 	;---------------------------------------------------------------------------
@@ -146,7 +134,7 @@ RESET_VECTOR    = $fffc
 	;---------------------------------------------------------------------------
 	new_patch(PutTapeByte, LE6C9)
 
-		-PutTapeByte
+		-PutTapeByte:
 			; Doit conserver X et Y
 			sta	CH376_DATA
 			dec	PTW
@@ -161,7 +149,7 @@ RESET_VECTOR    = $fffc
 			tax
 			pla
 			tay
-		ZZ0001
+		ZZ0001:
 			rts
 
 
@@ -169,9 +157,9 @@ RESET_VECTOR    = $fffc
 		; 58 Octets
 		;---------------------------------------------------------------------------
 		; Sauvegarde de l'entête
-		OpenTapeWrite
-			;lda #<TNAME			; Forcé dans SetFilename2
-			;ldy #>TNAME
+		OpenTapeWrite:
+			;lda #<PROGNAME			; Forcé dans SetFilename2
+			;ldy #>PROGNAME
 			jsr	SetFilename2
 			jsr	FileCreate
 
@@ -189,31 +177,31 @@ RESET_VECTOR    = $fffc
 			jsr	WriteLeader2
 
 			; Test STORE
-			bit	TH_TYPE			; STORE?
+			bit	PROGTYPE			; STORE?
 			bvc	CalcPgmLength		; Non -> Calcule la longueur du programme
 			jmp	CalcArrayLength		; Oui -> Calcule la longueur du tableau
 
 			; Optimisé (15+5)
-		CalcPgmLength
+		CalcPgmLength:
 			sec				; Calcule la taille du programme
-			lda	TH_END
-			sbc	TH_START
+			lda	PROGEND
+			sbc	PROGSTART
 			tax
 
-			lda	TH_END+1
-			sbc	TH_START+1
+			lda	PROGEND+1
+			sbc	PROGSTART+1
 			tay
 
-		WriteLength
+		WriteLength:
 			inx				; +1
 			bne	*+3
 			iny
 
 			txa
-		SetByteAndWrite
+		SetByteAndWrite:
 			jsr	SetByteWrite
 
-		WriteRqData
+		WriteRqData:
 			lda	#$2d			; WriteReqData
 			sta	CH376_COMMAND
 			lda	CH376_DATA
@@ -224,20 +212,20 @@ RESET_VECTOR    = $fffc
 		; 26 Octets - Calcul du nombre d'octets à écrire dans le fichier
 		;---------------------------------------------------------------------------
 		; 11 Octets
-		;	lda	TH_END
-		;	ldy	TH_END+1
-		;	bit	TH_TYPE			; Commande STORE?
+		;	lda	PROGEND
+		;	ldy	PROGEND+1
+		;	bit	PROGTYPE			; Commande STORE?
 		;	bvs	Fin			; Oui -> pas de calcul de la taille, c'est déjà fait
 
 			; Optimisé (10+5)
 		;	sec				; Calcule la taille du programme
-			;lda	TH_END			; Déjà fait
-		;	sbc	TH_START
+			;lda	PROGEND			; Déjà fait
+		;	sbc	PROGSTART
 		;	tax
 
-			;lda	TH_END+1
+			;lda	PROGEND+1
 		;	tya
-		;	sbc	TH_START+1
+		;	sbc	PROGSTART+1
 		;	tay
 
 		;	inx				; +1
@@ -261,18 +249,18 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; 25 Octets
 		;---------------------------------------------------------------------------
-		WaitResponse
+		WaitResponse:
 			ldy	#$ff
-		ZZZ009
+		ZZZ009:
 			ldx	#$ff
-		ZZZ010
+		ZZZ010:
 			lda	CH376_COMMAND
 			bmi	ZZZ011
 			lda	#$22
 			sta	CH376_COMMAND
 			lda	CH376_DATA
 			rts
-		ZZZ011
+		ZZZ011:
 			dex
 			bne	ZZZ010
 			dey
@@ -297,7 +285,7 @@ RESET_VECTOR    = $fffc
 		;										; RETURN;
 		;	rts
 
-	LE6C9
+	LE6C9:
 
 
 	;---------------------------------------------------------------------------
@@ -314,7 +302,7 @@ RESET_VECTOR    = $fffc
 		; *** Réécrire la procédure pour mettre un jmp OpenWriteTape au début ***
 
 	new_patch(WriteLeader,LE76A)
-		-WriteLeader
+		-WriteLeader:
 			;ldx	#$01
 			ldy	#$04
 			lda	#$16
@@ -326,22 +314,22 @@ RESET_VECTOR    = $fffc
 			rts
 
 			; Utilisé par SetFilename2
-		ZZD001
+		ZZD001:
 			.byte '.TAP',0
 
-	LE76A
+	LE76A:
 
 	;---------------------------------------------------------------------------
 	; 10 Octets à l'emplacement de "MICROSOFT!"
 	;---------------------------------------------------------------------------
 	new_patch($e435,LE43F)
 
-		CalcArrayLength
-			ldx	TH_START
-			ldy	TH_START+1
+		CalcArrayLength:
+			ldx	PROGSTART
+			ldy	PROGSTART+1
 			jmp	WriteLength
 			nop
-	LE43F
+	LE43F:
 
 
 
@@ -355,7 +343,7 @@ RESET_VECTOR    = $fffc
 	new_patchl($e4d9,3)
 
 		; TapeSync +45
-		LE4D9
+		LE4D9:
 			ldx	#$00			; Indique que les noms sont identiques
 			nop
 
@@ -375,7 +363,7 @@ RESET_VECTOR    = $fffc
 		; Sortir avec C=0 et $2B1=0 (pas d'erreur de parité) (2B1 doit être mise à 0 quelque part avant...)
 
 		; Ok: 24/51 octets
-		-GetTapeByte
+		-GetTapeByte:
 			lda	CH376_DATA
 			pha				; Sauvegarde A
 			dec	PTR
@@ -390,7 +378,7 @@ RESET_VECTOR    = $fffc
 			tax
 			pla
 			tay
-		ZZ0002
+		ZZ0002:
 			pla				; Restaure ACC et les flags en fonction de ACC
 			rts
 		; E6E1
@@ -399,7 +387,7 @@ RESET_VECTOR    = $fffc
 		; 35 Octets + 5 en ZZD001
 		;---------------------------------------------------------------------------
 			; SetFilename2: 38 octets
-		SetFilename2
+		SetFilename2:
 			;sta PTR_READ_DEST
 			;sty PTR_READ_DEST+1
 
@@ -407,18 +395,18 @@ RESET_VECTOR    = $fffc
 			sta	CH376_COMMAND
 			sta	CH376_DATA		; Pour ouverture de '/'
 			ldy	#$ff
-		ZZ0003
+		ZZ0003:
 			iny
 			;lda (PTR_READ_DEST),y
-			lda	TNAME,y
+			lda	PROGNAME,y
 			beq	ZZ0004
 			sta	CH376_DATA
 			bne	ZZ0003
 
-		ZZ0004
+		ZZ0004:
 			sty	$2f			; Sauvegarde la longueur (utilisée par CSAVE)
 			ldy	#$ff			; Ajoute '.TAP'
-		ZZ0005
+		ZZ0005:
 			iny
 			lda	ZZD001,y
 			sta	CH376_DATA
@@ -443,7 +431,7 @@ RESET_VECTOR    = $fffc
 		ZZ0003
 			iny
 			;lda	(PTR_READ_DEST),y
-			lda	TNAME,y
+			lda	PROGNAME,y
 			sta	CH376_DATA
 			bne	ZZ0003
 
@@ -453,26 +441,26 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; 28 Octets
 		;---------------------------------------------------------------------------
-		Mount
+		Mount:
 			lda	#$31
 			.byte $2c
 
-		FileOpen
+		FileOpen:
 			lda	#$32
 			.byte $2c
 
-		FileCreate
+		FileCreate:
 			lda	#$34
 
-		CH376_Cmd
+		CH376_Cmd:
 			sta	CH376_COMMAND
 
-		CH376_CmdWait
+		CH376_CmdWait:
 			jsr	WaitResponse
 			cmp	#INT_SUCCESS
 			rts
 		;---------------------------------------------------------------------------
-		FileClose
+		FileClose:
 			ldx	#$36
 			stx	CH376_COMMAND
 			sta	CH376_DATA
@@ -484,14 +472,14 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; 11 Octets
 		;---------------------------------------------------------------------------
-		ByteWrGo
+		ByteWrGo:
 			lda	#$3d
 			sta	CH376_COMMAND
 			jsr	WaitResponse
 			cmp	#INT_DISK_WRITE
 			rts
 
-		WriteLeader2
+		WriteLeader2:
 			jsr	SetByteAndWrite
 			jsr	WriteLeader		; Ecriture de l'amorce
 			jsr	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
@@ -499,7 +487,7 @@ RESET_VECTOR    = $fffc
 			rts
 
 		; E72b
-	LE735
+	LE735:
 
 	;---------------------------------------------------------------------------
 	; 32 Octets
@@ -512,9 +500,9 @@ RESET_VECTOR    = $fffc
 		; On pourrait sortir quand on a trouvé un $24 (inutile de remonter les $16 avant)
 
 		; Ok: 36/37 octets
-		-SyncTape
-			;lda	#<TNAME			; Forcé dans SetFilename2
-			;ldy	#>TNAME
+		-SyncTape:
+			;lda	#<PROGNAME			; Forcé dans SetFilename2
+			;ldy	#>PROGNAME
 			jsr	SetFilename2
 			jsr	FileOpen
 
@@ -526,7 +514,7 @@ RESET_VECTOR    = $fffc
 			ldx	#$00			; Sortir avec X=0 car utilisé en $E4B6 pour le Flag d'erreur
 			rts
 
-		ReadUSBData3
+		ReadUSBData3:
 			lda	#$27
 			sta	CH376_COMMAND
 			lda	CH376_DATA
@@ -538,7 +526,7 @@ RESET_VECTOR    = $fffc
 			nop
 			nop
 			nop
-	LE75A
+	LE75A:
 	; WriteLeader
 
 
@@ -558,20 +546,20 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 	new_patch(SetupTape,LE7AF)
 
-		-SetupTape
+		-SetupTape:
 			; E76A - E781: 24 octets
 			;InitVIA
 			; Ok: 10/24 octets
 
-		InitCH376
-		Exists
+		InitCH376:
+		Exists:
 			ldx	#6
 			stx	CH376_COMMAND
 			lda	#$ff
 			sta	CH376_DATA
 			lda	CH376_DATA
-			bne	ZZZ001
-		SetUSB
+			bne	InitError
+		SetUSB:
 			lda	#$15
 			sta	CH376_COMMAND
 		;	ldx	#6
@@ -583,11 +571,10 @@ RESET_VECTOR    = $fffc
 			jsr	Mount
 
 			;IFF ^.Z THEN InitError;
-			bne	ZZZ001
+			bne	InitError
 			rts
 
-		ZZZ001
-		InitError
+		InitError:
 			jmp	$d4da
 		;	ldx	#$d7
 		;	jmp	$c47e			; "?CAN'T CONTINUE ERROR"
@@ -601,34 +588,34 @@ RESET_VECTOR    = $fffc
 		; ATTENTION: Déborde sur la routine "Comparer nom demandé et non trouvé"
 		; en $E790 - $E7AE, d'ou le patch de la routine $E4AC
 		;---------------------------------------------------------------------------
-		SetByteRead
+		SetByteRead:
 			ldx	#$3a
 			.byte $2c
 
-		SetByteWrite
+		SetByteWrite:
 			ldx	#$3c
 
-		CH376_Cmd2
+		CH376_Cmd2:
 			stx	CH376_COMMAND
 			sta	CH376_DATA
 			sty	CH376_DATA
 
-		CH376_CmdWait2
+		CH376_CmdWait2:
 			jsr	WaitResponse
 			cmp	#INT_DISK_READ
 			rts
 		;---------------------------------------------------------------------------
-		ByteRdGo
+		ByteRdGo:
 			lda	#$3B
 			sta	CH376_COMMAND
 			bne	CH376_CmdWait2
 
-		LE790
+		LE790:
 		; E7A7
 
 #ifdef ORIX
 
-		BackToOrix
+		BackToOrix:
 			lda	#$07
 			sta	VIA2_IORA
 			jmp	(RESET_VECTOR)
@@ -642,7 +629,7 @@ RESET_VECTOR    = $fffc
 			nop
 			nop
 #endif
-	LE7AF
+	LE7AF:
 
 
 ;---------------------------------------------------------------------------
@@ -650,7 +637,7 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 	new_patch($e93d,LE946)
 
-		LE93D
+		LE93D:
 			; E93D - E945: 9 octets
 			; RestaureVIA
 			; En fait on ne change que l'intruction en $E940
@@ -660,7 +647,7 @@ RESET_VECTOR    = $fffc
 			jmp	FileClose
 		; E945
 			nop
-	LE946
+	LE946:
 		; CALL
 
 
@@ -681,11 +668,11 @@ RESET_VECTOR    = $fffc
 	new_patch($ed96,LEDC4)
 
 		; Maxi 44 octets
-		Copyright
+		Copyright:
 			.byte "ORIC EXTENDED BASIC V1.1", $0D, $0A
 			.byte $60," 1983 TANGERINE", $0D, $0A
 			.byte $00,$00
-	LEDC4
+	LEDC4:
 
 	;
 	; Couleur Papier/Encre au boot
@@ -717,14 +704,14 @@ RESET_VECTOR    = $fffc
 			bne	LFA31
 			lda	#$c0-$28
 			bne	LFA36
-		LFA31
+		LFA31:
 			inc	RAMSIZEFLAG
 			lda	#$40-$28
-		LFA36
+		LFA36:
 			sta	HIMEM_PTR+1
 			sta	HIMEM_MAX+1
 			rts
-	LFA3C
+	LFA3C:
 
 #endif
 
@@ -765,11 +752,11 @@ RESET_VECTOR    = $fffc
 	new_patch(TRON,LCD1F)
 
 			ldy	#$07
-		boucle
+		boucle:
 			lda	BackToOrix,y
 			sta	$00,y
 			dey
 			bpl	boucle
 			jmp	$0000
-	LCD1F
+	LCD1F:
 #endif
