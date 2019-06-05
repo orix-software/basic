@@ -1,0 +1,13 @@
+language: c
+before_install:
+    # - sudo apt-get update -qq
+    # - sudo apt-get install -qq git
+    # - sudo pip install --upgrade pip
+    # - sudo pip install mkdocs
+    # - git clone https://github.com/oric-software/buildTestAndRelease.git
+    # - cd buildTestAndRelease/ && sh make.sh
+    #- pushd ..
+    - git clone https://github.com/fachat/xa65.git ; fi
+    - pushd xa65/xa && make &> /dev/null
+    - cp file65 ldo65 reloc65 xa /home/travis/bin
+    - popd
