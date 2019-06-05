@@ -1,0 +1,67 @@
+image: buildpack-deps:trusty
+
+stages:
+        - build
+        - test
+        - deploy
+
+cache:
+        key: ${CI_COMMIT_REF_SLUG}
+        paths:
+                - xa65/
+
+job_build:
+        stage: build
+
+        only: 
+                - master
+
+        before_script:
+                # Prepare l'environnement "Travis"
+                # - mkdir -p /home/travis
+                # - ln -s /usr/local/bin /home/travis/bin
+                # - env
+                # Travis before_install
+                # - apt-get update && apt-get install -qq git unzip
+                # - pushd ..
+                - "if [ ! -d md2hlp ]; then git clone https://github.com/assinie/md2hlp.git ; fi"
+                - "if [ ! -d cc65   ]; then git clone https://github.com/cc65/cc65.git ; fi"
+                - pushd xa65/xa && make &> /dev/null
+                - cp file65 ldo65 reloc65 xa /usr/local/bin
+                - popd
+
+        script:
+                # Simule le fonctionnement de travis
+                - ./configure && make && make test
+
+        artifacts:
+                expire_in: 1 hour
+                paths:
+                    - build/
+
+
+job_test:
+        stage: test
+
+        only:
+                - master
+
+        cache:
+                policy: pull
+
+        script:
+                - ls
+
+job_deploy:
+        stage: deploy
+
+        only:
+                - master
+
+        cache:
+                policy: pull
+
+        script:
+                - ls -Rlh
+
+
