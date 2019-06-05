@@ -50,6 +50,11 @@ job_test:
         only:
                 - master
 
+        except:
+                changes:
+                        - .travis.yml
+                        - "*.md"
+
         cache:
                 policy: pull
 
@@ -61,6 +66,11 @@ job_deploy:
 
         only:
                 - master
+
+        except:
+                changes:
+                        - .travis.yml
+                        - "*.md"
 
         cache:
                 policy: pull
