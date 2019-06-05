@@ -16,6 +16,11 @@ job_build:
         only: 
                 - master
 
+        except:
+                changes:
+                        - .travis.yml
+                        - "*.md"
+
         before_script:
                 # Prepare l'environnement "Travis"
                 # - mkdir -p /home/travis
