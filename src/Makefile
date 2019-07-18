@@ -1,10 +1,17 @@
 PROJECT = basic_noram
 BUILDPATH = ../build/cart
 
+USB_MODE ?= usb_host
+
 # %<-------------------------------------------------------------------------->%
 
 AS = xa
-ASFLAGS = -M -DCSAVE -DCLOAD -DNORAMCHECK
+
+ifeq ($(USB_MODE),sdcard)
+	ASFLAGS = -M -DCSAVE -DCLOAD -DNORAMCHECK -DCH376_USB_MODE=3
+else
+	ASFLAGS = -M -DCSAVE -DCLOAD -DNORAMCHECK
+endif
 
 PATCH = ./patch.py
 PATCHFLAGS = --rom ../original/basic11b.rom

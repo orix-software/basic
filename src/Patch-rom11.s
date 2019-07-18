@@ -12,6 +12,13 @@
 #define new_patch(a,f) *=a-3 : .word a : .byte f-a
 #define new_patchl(a,l) *=a-3 : .word a : .byte l
 
+#define SDCARD_MODE $03
+#define USB_HOST_MODE $06
+
+#ifndef CH376_USB_MODE
+#define CH376_USB_MODE USB_HOST_MODE
+#endif
+
 ;---------------------------------------------------------------------------
 ;
 ;			Codes d'erreur du CH376
@@ -562,7 +569,7 @@ RESET_VECTOR    = $fffc
 		SetUSB:
 			lda	#$15
 			sta	CH376_COMMAND
-		;	ldx	#6
+			ldx	#CH376_USB_MODE
 			stx	CH376_DATA
 
 			;Wait 10us
@@ -620,8 +627,8 @@ RESET_VECTOR    = $fffc
 			sta	VIA2_IORA
 			jmp	(RESET_VECTOR)
 #else
-			nop
-			nop
+		;	nop
+		;	nop
 			nop
 			nop
 			nop
