@@ -12,12 +12,13 @@
 #define new_patch(a,f) *=a-3 : .word a : .byte f-a
 #define new_patchl(a,l) *=a-3 : .word a : .byte l
 
+;---------------------------------------------------------------------------
+;
+;			Modes du CH376
+;
+;---------------------------------------------------------------------------
 #define SDCARD_MODE $03
 #define USB_HOST_MODE $06
-
-#ifndef CH376_USB_MODE
-#define CH376_USB_MODE USB_HOST_MODE
-#endif
 
 ;---------------------------------------------------------------------------
 ;
@@ -29,7 +30,6 @@
 #define INT_DISK_READ $1D
 #define INT_DISK_WRITE $1E
 #define ABORT $5F
-
 
 ;---------------------------------------------------------------------------
 ;
@@ -45,12 +45,57 @@
 #define CYAN    6
 #define WHITE   7
 
+;---------------------------------------------------------------------------
+;
+;			Personnalisation
+;
+;---------------------------------------------------------------------------
+	;---------------------------------------------------------------------------
+	;			Couleurs par défaut
+	;---------------------------------------------------------------------------
 #ifndef DEFAULT_INK
-#define DEFAULT_INK YELLOW
+#define DEFAULT_INK WHITE
 #endif
 
 #ifndef DEFAULT_PAPER
 #define DEFAULT_PAPER BLACK
+#endif
+
+	;---------------------------------------------------------------------------
+	;			Message de Copyright
+	;---------------------------------------------------------------------------
+#ifndef COPYRIGHT_MSG
+#define COPYRIGHT_MSG1 "ORIC EXTENDED BASIC V1.1",$0D,$0A
+#define COPYRIGHT_MSG2 $60," 1983 TANGERINE",$0D,$0A
+#define COPYRIGHT_MSG COPYRIGHT_MSG1 , COPYRIGHT_MSG2
+#endif
+
+	;---------------------------------------------------------------------------
+	;			Mode du CH376
+	;---------------------------------------------------------------------------
+#ifndef CH376_USB_MODE
+#define CH376_USB_MODE USB_HOST_MODE
+#endif
+
+	;---------------------------------------------------------------------------
+	;			Commande QUIT
+	;---------------------------------------------------------------------------
+#ifdef BASIC_LET_IS_QUIT
+#undef BASIC_TRON_IS_QUIT
+#undef BASIC_TROFF_IS_QUIT
+#define BASIC_QUIT
+#endif
+
+#ifdef BASIC_LET_IS_TRON
+#undef BASIC_LET_IS_QUIT
+#undef BASIC_TROFF_IS_QUIT
+#define BASIC_QUIT
+#endif
+
+#ifdef BASIC_TROFF_IS_QUIT
+#undef BASIC_LET_IS_QUIT
+#undef BASIC_TRON_IS_QUIT
+#define BASIC_QUIT
 #endif
 
 ;---------------------------------------------------------------------------
@@ -60,6 +105,7 @@
 ;---------------------------------------------------------------------------
 HIMEM_PTR       = $a6
 
+TXTPTR          = $e9
 PTR             = $f3
 PTR_MAX         = $f4
 PTW             = $f5
@@ -90,7 +136,9 @@ PROGTYPE        = $02ae
 ;			Spécifique Telestrat
 ;
 ;---------------------------------------------------------------------------
-VIA2_IORA    = $0321
+VIA2_DDRA    = $0323
+VIA2_IORA    = $032f
+BUFEDT       = $0590
 
 ;---------------------------------------------------------------------------
 ;
@@ -103,6 +151,9 @@ CH376_DATA      = $0340
 ;---------------------------------------------------------------------------
 ;			Routines ROM v1.1
 ;---------------------------------------------------------------------------
+CharGet         = $00e2
+
+BackToBASIC     = $c4a8
 
 ClrTapeStatus   = $e5f5
 WriteFileHeader = $e607
@@ -111,6 +162,12 @@ WriteLeader     = $e75a
 GetTapeByte     = $e6c9
 SyncTape        = $e735
 SetupTape       = $e76a
+
+CLOAD           = $e85b
+
+CheckKbd        = $eb78
+
+StartBASIC      = $eccc
 
 RamTest         = $fa14
 TRON            = $cd16
@@ -592,7 +649,7 @@ RESET_VECTOR    = $fffc
 
 		;---------------------------------------------------------------------------
 		; 27 Octets
-		; ATTENTION: Déborde sur la routine "Comparer nom demandé et non trouvé"
+		; ATTENTION: Déborde sur la routine "Comparer nom demandé et nom trouvé"
 		; en $E790 - $E7AE, d'ou le patch de la routine $E4AC
 		;---------------------------------------------------------------------------
 		SetByteRead:
@@ -618,24 +675,14 @@ RESET_VECTOR    = $fffc
 			bne	CH376_CmdWait2
 
 		LE790:
-		; E7A7
+		; E7A9
 
-#ifdef ORIX
-
-		BackToOrix:
-			lda	#$07
-			sta	VIA2_IORA
-			jmp	(RESET_VECTOR)
-#else
-		;	nop
-		;	nop
 			nop
 			nop
 			nop
 			nop
 			nop
 			nop
-#endif
 	LE7AF:
 
 
@@ -667,30 +714,17 @@ RESET_VECTOR    = $fffc
 ;	jmp	$C47E			; "?CAN'T CONTINUE ERROR"
 
 ;---------------------------------------------------------------------------
-;			Personalisation de la ROM
+;			Patch de la routine StartBASIC
 ;---------------------------------------------------------------------------
-	;
-	; Message de Copyright
-	;
-	new_patch($ed96,LEDC4)
+	new_patch((StartBASIC+$B7),LED86)
+		; jmp BackToBASIC
+		jmp ORIX_AUTOLOAD
+	LED86:
 
-		; Maxi 44 octets
-		Copyright:
-			.byte "ORIC EXTENDED BASIC V1.1", $0D, $0A
-			.byte $60," 1983 TANGERINE", $0D, $0A
-			.byte $00,$00
-	LEDC4:
 
-	;
-	; Couleur Papier/Encre au boot
-	;
-	new_patchl($f914,10)
-
-			lda	#DEFAULT_INK
-			sta	INK_VAL
-			lda	#$10+DEFAULT_PAPER
-			sta	PAPER_VAL
-
+;---------------------------------------------------------------------------
+;			Patch de la routine RamTest
+;---------------------------------------------------------------------------
 #ifdef NORAMCHECK
 	;
 	; Supprime le test de la RAM
@@ -698,7 +732,7 @@ RESET_VECTOR    = $fffc
 	;
 	; Libère de $FA3C à $FA85 soit 74 octets
 	;
-	new_patch(RamTest,LFA3C)
+	new_patch(RamTest,LFA86)
 			ldy	#$00
 			sty	RAMFAULT
 			sty	RAMSIZEFLAG
@@ -719,26 +753,263 @@ RESET_VECTOR    = $fffc
 			sta	HIMEM_MAX+1
 			rts
 	LFA3C:
+		ORIX_AUTOLOAD:
+			lda #<(BUFEDT+6)
+			sta TXTPTR
+			lda #>(BUFEDT+6)
+			sta TXTPTR+1
+			jsr CharGet
+			beq *+5
+			jmp CLOAD
+			jmp BackToBASIC
+
+#ifdef BASIC_QUIT
+		QUIT:
+			ldy	#$0C
+		boucle:
+			lda	BackToOrix,y
+			sta	$00,y
+			dey
+			bpl	boucle
+			jmp	$0000
+
+		BackToOrix:
+			sei
+			lda	#$07
+			sta	VIA2_IORA
+			sta	VIA2_DDRA
+			jmp	(RESET_VECTOR)
+#endif
+
+#ifdef JOYSTICK_DRIVER
+VIA2_IORB=$320
+; Si Détournement en CheckKbd
+#ifndef USE_CHECKKBD
+		CheckJoystick:
+			lda $02df
+			bpl *+3
+			rts
+			;ldx #$00		; Si on peut modifier X
+			ldy #$00		; Si on peut modifier Y
+			lda VIA2_IORB		; 35 Octets
+			and #$1f
+			lsr
+			bcc right
+			lsr
+			bcc left
+			lsr
+			bcc fire
+			lsr
+			bcc down
+			lsr
+		;	bcc up
+		;	rts
+			bcs CheckJoystick+5
+#else
+ReadKbd = $f495
+		CheckJoystick:
+			pha
+			ldx #$ff		; Si on peut modifier Y
+			lda VIA2_IORB		; 35 Octets
+			and #$1f
+			lsr
+			bcc right
+			lsr
+			bcc left
+			lsr
+			bcc fire
+			lsr
+			bcc down
+			lsr
+			bcc up
+			pla
+			jmp ReadKbd
+		up
+			inx
+		right
+			inx
+		left
+			inx
+		fire
+			inx
+		down
+			inx
+			lda $00,x
+			beq up-4
+			tax
+			pla
+			rts
+#endif
+#if 0
+; Valeurs Fixes
+		up
+			lda #'U'+$80
+			rts
+		right
+			lda #'R'+$80
+			rts
+		left
+			lda #'L'+$80
+			rts
+		fire
+			lda #'F'+$80
+			rts
+		down
+			lda #'D'+$80
+			rts
+#endif
+
+#if 0
+; valeurs dans une table
+; (15 octets)
+		up
+			lda $00
+			rts
+		right
+			lda $01
+			rts
+		left
+			lda $02
+			rts
+		fire
+			lda $03
+			rts
+		down
+			lda $04
+			rts
+#endif
+
+#if 0
+; valeurs dans une table (version optimisée)
+; A condition de pouvoir modifier X
+; 7 Octets +2
+		up
+			inx
+		right
+			inx
+		left
+			inx
+		fire
+			inx
+		down
+			inx
+			lda $00,x
+			rts
+#endif
+
+#if 0
+; valeurs dans une table (version optimisée)
+; A condition de pouvoir modifier Y
+; 7 Octets +2
+		up
+			; iny
+		right
+			iny
+		left
+			iny
+		fire
+			iny
+		down
+			iny
+			lda $00,y
+			rts
+#endif
+
+; Si Détournement en CheckKbd
+#if 1
+; valeurs dans une table (version optimisée)
+; A condition de pouvoir modifier Y
+; 7 Octets +2
+		up
+			iny
+		fire
+			iny
+		left
+			iny
+		right
+			iny
+		down
+			lda $00,y
+			rts
+#endif
 
 #endif
 
+#print *
+#if * > $fa86
+#print "*** ERROR NORAMCHECK too long"
+#endif
+		.dsb $fa86-*, $EA
+	LFA86:
+#endif
+
 ;---------------------------------------------------------------------------
-; Pointe vers le message de Copyright
-; Pour Telestrat (signature de la banque)
+;			Personnalisation de la ROM
 ;---------------------------------------------------------------------------
-	new_patchl($fff8,2)
-			.word Copyright
+	;
+	; Message de Copyright
+	;
+	new_patch($ed96,LEDC4)
+		; Maxi 44 octets
+		Copyright:
+			.byte COPYRIGHT_MSG
+
+#if * > $EDC3
+#print "*** ERROR 'COPYRIGHT_MSG' too long"
+#endif
+
+			.dsb $EDC4-*,$00
+	LEDC4:
+
+	;
+	; Couleur Papier/Encre au boot
+	;
+	new_patchl($f914,10)
+
+			lda	#DEFAULT_INK
+			sta	INK_VAL
+			lda	#$10+DEFAULT_PAPER
+			sta	PAPER_VAL
 
 
 ;---------------------------------------------------------------------------
-; Modification pour la commande 'bank' de Orix
-; qui fait un 'jmp $c000' et non un 'jmp ($fffc)
+;			Modifications pour Orix
 ;---------------------------------------------------------------------------
-	new_patchl($c000,3)
-			jmp	Reset
+
+	;---------------------------------------------------------------------------
+	; Pointe vers le message de Copyright
+	; Pour Telestrat (signature de la banque)
+	;---------------------------------------------------------------------------
+		new_patchl($fff8,2)
+				.word Copyright
 
 
-#ifdef ORIX
+	;---------------------------------------------------------------------------
+	; Modification pour la commande 'bank' de Orix
+	; qui fait un 'jmp $c000' et non un 'jmp ($fffc)
+	;---------------------------------------------------------------------------
+		new_patchl($c000,3)
+				jmp	Reset
+
+
+;---------------------------------------------------------------------------
+;Commande de retour à Orix
+;---------------------------------------------------------------------------
+#ifdef BASIC_LET_IS_QUIT
+	;---------------------------------------------------------------------------
+	; Remplace LET par OUT
+	;---------------------------------------------------------------------------
+	new_patchl($c149,3)
+			.byte 'OU','T'+$80
+
+	;---------------------------------------------------------------------------
+	; Modifie adresses d'exécution LET -> QUIT
+	;---------------------------------------------------------------------------
+	new_patchl($c032,2)
+			.word QUIT-1
+#endif
+
+#ifdef BASIC_TRON_IS_QUIT
 	;---------------------------------------------------------------------------
 	; Remplace TRON par QUIT
 	;---------------------------------------------------------------------------
@@ -746,24 +1017,52 @@ RESET_VECTOR    = $fffc
 			.byte 'QUI','T'+$80
 
 	;---------------------------------------------------------------------------
+	; Modifie adresses d'exécution TRON -> QUIT
+	;---------------------------------------------------------------------------
+	new_patchl($c00e,2)
+			.word QUIT-1
+
+	;---------------------------------------------------------------------------
 	; Modifie adresses d'exécution TROFF -> QUIT
 	; au cas ou...
 	;---------------------------------------------------------------------------
 	new_patchl($c010,2)
-			.word TRON-1
+			.word QUIT-1
 
 	;---------------------------------------------------------------------------
-	; Modification de TRON pour retour vers ORIX
-	; /|\ Seulement 9 octets disponibles de $CD16 à $CD1E inclus
+	; 9 octets disponibles de $CD16 à $CD1E inclus
 	;---------------------------------------------------------------------------
-	new_patch(TRON,LCD1F)
-
-			ldy	#$07
-		boucle:
-			lda	BackToOrix,y
-			sta	$00,y
-			dey
-			bpl	boucle
-			jmp	$0000
-	LCD1F:
+	;LCD16
+	;LCD1F:
 #endif
+
+;---------------------------------------------------------------------------
+;			Ajout Driver Joystick Telestrat
+;---------------------------------------------------------------------------
+#ifdef JOYSTICK_DRIVER
+	;---------------------------------------------------------------------------
+	; Patch pour la routine par défaut en $02B (Kbd_hook)
+	;---------------------------------------------------------------------------
+	;new_patchl($f87f,3)
+	;	jmp CheckJoystick
+
+	;---------------------------------------------------------------------------
+	; Patch pour de la routine CheckKbd
+	;---------------------------------------------------------------------------
+	new_patchl(CheckKbd,3)
+;	new_patchl($EE62,3)
+		jsr CheckJoystick
+
+	;---------------------------------------------------------------------------
+	; Patch pour l'instruction GET
+	;---------------------------------------------------------------------------
+	;new_patchl($cdb5,3)
+	;	jsr CheckJoystick
+
+	;---------------------------------------------------------------------------
+	; Patch pour l'instruction KEY$
+	;---------------------------------------------------------------------------
+	;new_patchl($dada,3)
+	;	jsr CheckJoystick
+#endif
+
