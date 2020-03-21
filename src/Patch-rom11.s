@@ -935,7 +935,7 @@ ReadKbd = $f495
 
 #endif
 
-#print *
+;#print *
 #if * > $fa86
 #print "*** ERROR NORAMCHECK too long"
 #endif
