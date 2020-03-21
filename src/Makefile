@@ -42,13 +42,13 @@ endif
 #
 ifeq ($(USB_MODE),sdcard)
 	PROJECT = basicsd
-	COPYRIGHT_MSG = 'ORIC BASIC 1.1 - $(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN) / SD'
-	ASFLAGS = -M -DNORAMCHECK -DCH376_USB_MODE=3
+	COPYRIGHT_MSG = "ORIC BASIC 1.1 - $(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN) / SD"
+	ASFLAGS += -DNORAMCHECK -DCH376_USB_MODE=3
 else
 	#ASFLAGS = -M -DNORAMCHECK -DBASIC_LET_IS_QUIT
 	PROJECT = basicusb
 	COPYRIGHT_MSG = 'ORIC BASIC 1.1 - $(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN) / USB'
-	ASFLAGS = -M -DNORAMCHECK -DCH376_USB_MODE=6
+	ASFLAGS += -DNORAMCHECK -DCH376_USB_MODE=6
 endif
 
 #
@@ -64,7 +64,7 @@ endif
 
 
 ifneq ($(COPYRIGHT_MSG),)
-	ASFLAGS += -DCOPYRIGHT_MSG="$(COPYRIGHT_MSG)"
+	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
 endif
 
 
@@ -88,7 +88,15 @@ endif
 # Définition des outils
 #
 
+# Ne pas utiliser le flag -M avec la version OSDK de xa,
+# il n'est pas correctement géré...
 AS = xa
+ifeq ($(shell $(AS) --version 2>/dev/null),)
+	OSDK_FOUND = 1
+else
+	# La version officielle nécessite le flag -M à cause de ':' dans les commentaires
+	ASFLAGS += -M
+endif
 
 PATCH = ./patch.py
 PATCHFLAGS = --rom ../original/basic11b.rom
@@ -147,7 +155,11 @@ help:
 
 configure:
 	@mkdir -p $(BUILDPATH)
-
+ifeq ($(OSDK_FOUND),)
+	@echo "Using official xa"
+else
+	@echo "OSDK found"
+endif
 
 clean:
 	cd $(BUILDPATH) && rm -f $(OBJ) $(LBL)

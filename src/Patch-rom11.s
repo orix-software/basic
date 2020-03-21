@@ -379,7 +379,7 @@ RESET_VECTOR    = $fffc
 
 			; Utilisé par SetFilename2
 		ZZD001:
-			.byte '.TAP',0
+			.byte ".TAP",0
 
 	LE76A:
 
@@ -1000,7 +1000,7 @@ ReadKbd = $f495
 	; Remplace LET par OUT
 	;---------------------------------------------------------------------------
 	new_patchl($c149,3)
-			.byte 'OU','T'+$80
+			.byte "OU","T"+$80
 
 	;---------------------------------------------------------------------------
 	; Modifie adresses d'exécution LET -> QUIT
@@ -1014,7 +1014,7 @@ ReadKbd = $f495
 	; Remplace TRON par QUIT
 	;---------------------------------------------------------------------------
 	new_patchl($c0fc,4)
-			.byte 'QUI','T'+$80
+			.byte "QUI","T"+$80
 
 	;---------------------------------------------------------------------------
 	; Modifie adresses d'exécution TRON -> QUIT
