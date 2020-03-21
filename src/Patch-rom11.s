@@ -74,7 +74,7 @@
 	;			Mode du CH376
 	;---------------------------------------------------------------------------
 #ifndef CH376_USB_MODE
-#define CH376_USB_MODE USB_HOST_MODE
+#define CH376_USB_MODE SDCARD_MODE
 #endif
 
 	;---------------------------------------------------------------------------
@@ -86,7 +86,7 @@
 #define BASIC_QUIT
 #endif
 
-#ifdef BASIC_LET_IS_TRON
+#ifdef BASIC_TRON_IS_QUIT
 #undef BASIC_LET_IS_QUIT
 #undef BASIC_TROFF_IS_QUIT
 #define BASIC_QUIT

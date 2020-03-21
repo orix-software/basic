@@ -1,20 +1,59 @@
-PROJECT = basic_noram
+#
+# Spécifique au Projet
+#
+
+PROJECT = basicsd
 BUILDPATH = ../build/cart
 
-USB_MODE ?= usb_host
+USB_MODE ?= sdcard
+BACK_TO_ORIX ?= TRON
 
 # %<-------------------------------------------------------------------------->%
+#               Ne rien modifier au dela de cette ligne
+#
 
-AS = xa
-
-ifeq ($(USB_MODE),sdcard)
-	ASFLAGS = -M -DNORAMCHECK -DBASIC_LET_IS_QUIT -DCH376_USB_MODE=3
-	PROJECT = basicsd_noram
+#
+# Récupère le nom de la branche pour en extraire le n° de  version
+#
+ifeq ($(TRAVIS_BRANCH),)
+	GIT_BRANCH := $(shell git branch 2>/dev/null | grep '*' | cut -d' ' -f2)
 else
-	#ASFLAGS = -M -DNORAMCHECK -DBASIC_LET_IS_QUIT
-	ASFLAGS = -M -DNORAMCHECK
+	GIT_BRANCH := $(TRAVIS_BRANCH)
 endif
 
+#
+# Le nom de la branche est <annee>.<trimestre>
+#
+ifneq ($(GIT_BRANCH),master)
+	PROJECT_VERSION_MAJ := $(shell echo ${GIT_BRANCH} | cut -d. -f1)
+	PROJECT_VERSION_MIN := $(shell echo ${GIT_BRANCH} | cut -d. -f2)
+else
+	PROJECT_VERSION_MAJ := 99
+	PROJECT_VERSION_MIN := 9
+endif
+
+ifeq ($(PROJECT_VERSION_MAJ),$(PROJECT_VERSION_MIN))
+	PROJECT_VERSION_MAJ := 66
+	PROJECT_VERSION_MIN := 6
+endif
+
+#
+# Sélection du type de carte (usb_host / sdcard)
+#
+ifeq ($(USB_MODE),sdcard)
+	PROJECT = basicsd
+	COPYRIGHT_MSG = 'ORIC BASIC 1.1 - $(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN) / SD'
+	ASFLAGS = -M -DNORAMCHECK -DCH376_USB_MODE=3
+else
+	#ASFLAGS = -M -DNORAMCHECK -DBASIC_LET_IS_QUIT
+	PROJECT = basicusb
+	COPYRIGHT_MSG = 'ORIC BASIC 1.1 - $(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN) / USB'
+	ASFLAGS = -M -DNORAMCHECK -DCH376_USB_MODE=6
+endif
+
+#
+# Personnalisations diverses
+#
 ifneq ($(INK),)
 	ASFLAGS += -DDEFAULT_INK=$(INK)
 endif
@@ -23,16 +62,40 @@ ifneq ($(PAPER),)
 	ASFLAGS += -DDEFAULT_PAPER=$(PAPER)
 endif
 
+
 ifneq ($(COPYRIGHT_MSG),)
 	ASFLAGS += -DCOPYRIGHT_MSG="$(COPYRIGHT_MSG)"
 endif
+
 
 ifneq ($(JOYSTICK),)
 	ASFLAGS += -DJOYSTICK_DRIVER
 endif
 
+
+ifeq ($(BACK_TO_ORIX),LET)
+	ASFLAGS += -DBASIC_LET_IS_QUIT
+
+else ifeq ($(BACK_TO_ORIX),TRON)
+	ASFLAGS += -DBASIC_TRON_IS_QUIT
+
+else ifeq ($(BACK_TO_ORIX),TROFF)
+	ASFLAGS += -DBASIC_TROFF_IS_QUIT
+endif
+
+
+#
+# Définition des outils
+#
+
+AS = xa
+
 PATCH = ./patch.py
 PATCHFLAGS = --rom ../original/basic11b.rom
+
+#
+# Règles Make
+#
 
 .PHONY = configure symbols help clean mrproper
 
@@ -41,10 +104,6 @@ OBJ = $(SRC:.s=.o)
 ROM = $(PROJECT).rom
 LBL = $(SRC:.s=.lbl)
 SYM = $(LBL:.lbl=.sym)
-
-#
-# Règles Make
-#
 
 all: configure $(BUILDPATH)/$(ROM)
 
@@ -55,7 +114,7 @@ $(BUILDPATH)/%.o: %.s
 
 
 $(BUILDPATH)/$(ROM): $(BUILDPATH)/$(OBJ)
-	@echo "Create $(ROM)"
+	@echo "Create $(ROM) - $(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)"
 	@$(PATCH) $(PATCHFLAGS) -p $< -o $@
 
 
