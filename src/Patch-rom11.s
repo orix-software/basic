@@ -94,8 +94,15 @@
 
 #ifdef BASIC_TROFF_IS_QUIT
 #undef BASIC_LET_IS_QUIT
-#undef BASIC_TRON_IS_QUIT
+#define BASIC_TRON_IS_QUIT
 #define BASIC_QUIT
+#endif
+
+	;---------------------------------------------------------------------------
+	;			Gestion Joystick
+	;---------------------------------------------------------------------------
+#ifdef JOYSTICK_DRIVER
+#undef CHECKRAM_16K
 #endif
 
 ;---------------------------------------------------------------------------
@@ -570,6 +577,11 @@ RESET_VECTOR    = $fffc
 			jsr	SetFilename2
 			jsr	FileOpen
 
+#ifdef BASIC_TRON_IS_QUIT
+			beq *+5
+			jmp NotFound
+#endif
+
 			lda	#$ff
 			tay
 			jsr	SetByteRead
@@ -585,11 +597,13 @@ RESET_VECTOR    = $fffc
 			sta	PTR
 			rts
 		; E755
+#ifndef BASIC_TRON_IS_QUIT
 			nop
 			nop
 			nop
 			nop
 			nop
+#endif
 	LE75A:
 	; WriteLeader
 
@@ -674,15 +688,19 @@ RESET_VECTOR    = $fffc
 			sta	CH376_COMMAND
 			bne	CH376_CmdWait2
 
+		;---------------------------------------------------------------------------
+		; Efface la ligne de status + 'OUT OF DATA ERROR'
+		; Utilisé pour indiquer une erreur lors de la lecure d'un fichier
 		LE790:
 		; E7A9
-
-			nop
-			nop
-			nop
-			nop
-			nop
-			nop
+			jsr LE93D
+			jmp $d35c
+;			nop
+;			nop
+;			nop
+;			nop
+;			nop
+;			nop
 	LE7AF:
 
 
@@ -739,15 +757,21 @@ RESET_VECTOR    = $fffc
 			sty	$0500
 			sty	HIMEM_PTR
 			sty	HIMEM_MAX
+#ifdef CHECKRAM_16K
+			; Test 48Ko
 			dey
 			sty	$4500
 			lda	$0500
 			bne	LFA31
+#endif
 			lda	#$c0-$28
+#ifdef CHECKRAM_16K
 			bne	LFA36
 		LFA31:
+			; 16Ko seulement
 			inc	RAMSIZEFLAG
 			lda	#$40-$28
+#endif
 		LFA36:
 			sta	HIMEM_PTR+1
 			sta	HIMEM_MAX+1
@@ -1032,8 +1056,20 @@ ReadKbd = $f495
 	;---------------------------------------------------------------------------
 	; 9 octets disponibles de $CD16 à $CD1E inclus
 	;---------------------------------------------------------------------------
-	;LCD16
-	;LCD1F:
+	new_patch(TRON, LCD1F)
+		NotFound:
+			; jsr SyncTape
+			pla
+			pla
+			; jsr TapeSync
+			pla
+			pla
+			; php
+			pla
+
+			jmp LE790
+			nop
+		LCD1F
 #endif
 
 ;---------------------------------------------------------------------------
