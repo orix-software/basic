@@ -21,16 +21,15 @@ else
 	GIT_BRANCH := $(TRAVIS_BRANCH)
 endif
 
+ifeq ($(GIT_BRANCH),master)
+	GIT_BRANCH := $(shell cat VERSION 2>/dev/null)
+endif
+
 #
 # Le nom de la branche est <annee>.<trimestre>
 #
-ifneq ($(GIT_BRANCH),master)
-	PROJECT_VERSION_MAJ := $(shell echo ${GIT_BRANCH} | cut -d. -f1)
-	PROJECT_VERSION_MIN := $(shell echo ${GIT_BRANCH} | cut -d. -f2)
-else
-	PROJECT_VERSION_MAJ := 99
-	PROJECT_VERSION_MIN := 9
-endif
+PROJECT_VERSION_MAJ := $(shell echo ${GIT_BRANCH} | cut -d. -f1)
+PROJECT_VERSION_MIN := $(shell echo ${GIT_BRANCH} | cut -d. -f2)
 
 ifeq ($(PROJECT_VERSION_MAJ),$(PROJECT_VERSION_MIN))
 	PROJECT_VERSION_MAJ := 66
