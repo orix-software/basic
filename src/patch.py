@@ -22,7 +22,7 @@ import struct
 __program_name__ = 'patch'
 __description__ = "Patch ROM file"
 __plugin_type__ = 'TOOL'
-__version__ = '0.1'
+__version__ = '0.2'
 
 # ------------------------------------------------------------------------------
 
@@ -59,11 +59,13 @@ def patch_rom(fname, rom, base):
         i = 0
         while i < flen:
             addr = struct.unpack('<H', fd.read(2))[0]
-            length = ord(fd.read(1))
-            i += 3
+            #length = ord(fd.read(1))
+            #i += 3
+            length = struct.unpack('<H', fd.read(2))[0]
+            i += 4
 
-            # eprint('Address: 0x%04.4x' % addr)
-            # eprint('Length : 0x%02.2x\n' % length)
+            #eprint('Address: 0x%04.4x' % addr)
+            #eprint('Length : 0x%04.4x\n' % length)
 
             patch = fd.read(length)
             if isinstance(patch, str):

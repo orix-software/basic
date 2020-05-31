@@ -9,8 +9,8 @@
 ;---------------------------------------------------------------------------
 ;				MACROS
 ;---------------------------------------------------------------------------
-#define new_patch(a,f) *=a-3 : .word a : .byte f-a
-#define new_patchl(a,l) *=a-3 : .word a : .byte l
+#define new_patch(a,f) *=a-4 : .word a : .word (f-a)
+#define new_patchl(a,l) *=a-4 : .word a : .word l
 
 ;---------------------------------------------------------------------------
 ;
@@ -102,7 +102,21 @@
 	;			Gestion Joystick
 	;---------------------------------------------------------------------------
 #ifdef JOYSTICK_DRIVER
+#define JOYSTICK_READKBDCOL
+#define JOY_TBL $f5
+#define NO_CHARSET
 #undef CHECKRAM_16K
+#endif
+
+
+	;---------------------------------------------------------------------------
+	;			Chargement du jeu de caractères
+	;---------------------------------------------------------------------------
+#ifdef NO_CHARSET
+#ifndef DEFAULT_CHARSET
+#define DEFAULT_CHARSET "/USR/SHARE/FONTS/DEFAULT.CHS"
+#endif
+#echo "Default charset: DEFAULT_CHARSET"
 #endif
 
 ;---------------------------------------------------------------------------
@@ -110,13 +124,17 @@
 ;			Variables en page 0
 ;
 ;---------------------------------------------------------------------------
+KBD_flag        = $2e
+INTTMP          = $33			; $33-$34: Utilisé par GetTapeData
+
 HIMEM_PTR       = $a6
 
 TXTPTR          = $e9
 PTR             = $f3
-PTR_MAX         = $f4
-PTW             = $f5
-PTW_MAX         = $f6
+PTW             = $f4
+;PTR_MAX         = $f4
+;PTW             = $f5
+;PTW_MAX         = $f6
 
 
 ;---------------------------------------------------------------------------
@@ -143,6 +161,7 @@ PROGTYPE        = $02ae
 ;			Spécifique Telestrat
 ;
 ;---------------------------------------------------------------------------
+VIA2_IORB    = $0320
 VIA2_DDRA    = $0323
 VIA2_IORA    = $032f
 BUFEDT       = $0590
@@ -160,7 +179,18 @@ CH376_DATA      = $0340
 ;---------------------------------------------------------------------------
 CharGet         = $00e2
 
+LC496           = $c496
 BackToBASIC     = $c4a8
+DoNextLine      = $c8c1
+SetScreen       = $c82f
+
+NewLine         = $cbf0
+PrintString     = $ccb0
+LCCD7           = $ccd7
+
+TRON            = $cd16
+
+GetTapeData     = $e4e0
 
 ClrTapeStatus   = $e5f5
 WriteFileHeader = $e607
@@ -169,15 +199,26 @@ WriteLeader     = $e75a
 GetTapeByte     = $e6c9
 SyncTape        = $e735
 SetupTape       = $e76a
+CheckFoundName  = $e790
 
 CLOAD           = $e85b
 
 CheckKbd        = $eb78
 
+StopTimer       = $ee1a
+
 StartBASIC      = $eccc
 
+ReadKbd         = $f495
+LF4C6           = ReadKbd+49
+
+ReadKbdCol      = $f561
+
+LF8B8           = $f8b8
+
 RamTest         = $fa14
-TRON            = $cd16
+CharSet         = $fc78
+KeyCodeTab      = $ff78
 
 Reset           = $f88f
 
@@ -206,6 +247,7 @@ RESET_VECTOR    = $fffc
 	new_patch(PutTapeByte, LE6C9)
 
 		-PutTapeByte:
+		.(
 			; Doit conserver X et Y
 			sta	CH376_DATA
 			dec	PTW
@@ -222,7 +264,7 @@ RESET_VECTOR    = $fffc
 			tay
 		ZZ0001:
 			rts
-
+		.)
 
 		;---------------------------------------------------------------------------
 		; 58 Octets
@@ -321,6 +363,7 @@ RESET_VECTOR    = $fffc
 		; 25 Octets
 		;---------------------------------------------------------------------------
 		WaitResponse:
+		.(
 			ldy	#$ff
 		ZZZ009:
 			ldx	#$ff
@@ -339,6 +382,7 @@ RESET_VECTOR    = $fffc
 			rts
 			nop
 			nop
+		.)
 		;---------------------------------------------------------------------------
 		; Version sans Timeout: 14 Octets
 		;---------------------------------------------------------------------------
@@ -374,6 +418,7 @@ RESET_VECTOR    = $fffc
 
 	new_patch(WriteLeader,LE76A)
 		-WriteLeader:
+		.(
 			;ldx	#$01
 			ldy	#$04
 			lda	#$16
@@ -385,9 +430,9 @@ RESET_VECTOR    = $fffc
 			rts
 
 			; Utilisé par SetFilename2
-		ZZD001:
+		&ZZD001:
 			.byte ".TAP",0
-
+		.)
 	LE76A:
 
 	;---------------------------------------------------------------------------
@@ -408,19 +453,68 @@ RESET_VECTOR    = $fffc
 ;				CLOAD
 ;---------------------------------------------------------------------------
 
-	;LE4AC
-	; Chargement de l'entête => supprime le test nom demandé == nom trouvé
 
-	new_patchl($e4d9,3)
+	new_patch(GetTapeData,LE50A)
+		;---------------------------------------------------------------------------
+		; _GetTapeData (43 octets / 43 octets pour la version BASIC 1.1)
+		;---------------------------------------------------------------------------
+		; Charge un programme en mémoire
+		; Doit être appelé APRES SetByteRead
+		;
+		; Entree:
+		;	AY: Adresse de chargement
+		;
+		; Sortie:
+		;	AY: Code erreur CH376 ($41 si Ok)
+		;
+		; Modifie:
+		;	INTTMP: Pointeur adresse de chargement
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	ReadUSBData
+		;	ByteRdGo
+		;---------------------------------------------------------------------------
+		-GetTapeData:
+		.(
+			jsr	SetByteReadWrite
+			bne	_GetTapeData_error
 
-		; TapeSync +45
-		LE4D9:
-			ldx	#$00			; Indique que les noms sont identiques
-			nop
+			lda PROGSTART
+			ldy PROGSTART+1
+			sta INTTMP
+			sty INTTMP+1
 
-		;LE4E0
-		; Chargement du programme => pas de changement
+			; Boucle de chargement de la fonte (27 octets)
+		loop:
+			; On peut supprimer les lda/ldy si on supprime les sta/sty de ReadUSBData
+			lda INTTMP
+			ldy INTTMP+1
+			jsr ReadUSBData
 
+			;clc
+			;bcs ReadNextChunk
+			cpy #$00		; Nombre d'octets lus == 0?
+			beq fin
+
+			; Ajuste le pointeur
+			clc
+			tya
+			adc INTTMP
+			sta INTTMP
+			bcc *+4
+			inc INTTMP+1
+
+		ReadNextChunk:
+			jsr ByteRdGo
+			beq loop
+
+		fin:
+		_GetTapeData_error:
+			rts
+		.)
+	LE50A:
 
 	;---------------------------------------------------------------------------
 	; 24 Octets
@@ -435,23 +529,33 @@ RESET_VECTOR    = $fffc
 
 		; Ok: 24/51 octets
 		-GetTapeByte:
-			lda	CH376_DATA
-			pha				; Sauvegarde A
-			dec	PTR
-			bne	ZZ0002
-			tya				; Sauvegarde X,Y
-			pha
-			txa
-			pha
-			jsr	ByteRdGo
-			jsr	ReadUSBData3
-			pla				; Restaure X,Y
-			tax
-			pla
-			tay
-		ZZ0002:
-			pla				; Restaure ACC et les flags en fonction de ACC
-			rts
+		; ----------------------------------------------------------------------------
+		; GetTapeByte: Modifié (28 octets)
+		; ----------------------------------------------------------------------------
+		.(
+		        tya                                     ; E6C9 98
+		        pha                                     ; E6CA 48
+		        txa                                     ; E6CB 8A
+		        pha                                     ; E6CC 48
+
+			; On lit 1 caractère
+;			lda	#$01
+;			ldy	#$00
+;			jsr	SetByteRead
+;			bne	fin_erreur
+
+			jsr 	ReadUSBData3			; Lit un caractère, résultat dans $2f
+
+;		fin_erreur:
+
+		fin:
+		        pla                                     ; E6F5 68
+		        tax                                     ; E6F6 AA
+		        pla                                     ; E6F7 68
+		        tay                                     ; E6F8 A8
+		        lda     $2F                             ; E6F9 A5 2F
+		        rts                                     ; E6FB 60
+		.)
 		; E6E1
 
 		;---------------------------------------------------------------------------
@@ -459,6 +563,7 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 			; SetFilename2: 38 octets
 		SetFilename2:
+		.(
 			;sta PTR_READ_DEST
 			;sty PTR_READ_DEST+1
 
@@ -471,6 +576,16 @@ RESET_VECTOR    = $fffc
 			;lda (PTR_READ_DEST),y
 			lda	PROGNAME,y
 			beq	ZZ0004
+
+#ifdef FORCE_UPPERCASE
+			; Force le nom du fichier .tap en majuscules
+		        cmp     #'a'
+		        bcc     bk2
+		        cmp     #'z'+1
+		        bcs     bk2
+		        eor     #'a'-'A'
+		bk2
+#endif
 			sta	CH376_DATA
 			bne	ZZ0003
 
@@ -483,7 +598,7 @@ RESET_VECTOR    = $fffc
 			sta	CH376_DATA
 			bne	ZZ0005
 			rts
-
+		.)
 
 #if 0
 		;---------------------------------------------------------------------------
@@ -570,40 +685,36 @@ RESET_VECTOR    = $fffc
 		; Sortie ACC: octet trouvé
 		; On pourrait sortir quand on a trouvé un $24 (inutile de remonter les $16 avant)
 
-		; Ok: 36/37 octets
+		; ----------------------------------------------------------------------------
+		; SyncTape: Modifié (31 octets /37)
+		; ----------------------------------------------------------------------------
 		-SyncTape:
-			;lda	#<PROGNAME			; Forcé dans SetFilename2
-			;ldy	#>PROGNAME
+		.(
+			; Il faut vérifier si on à déjà ouvert un fichier ou non
+			; pour le multitap
 			jsr	SetFilename2
 			jsr	FileOpen
-
-#ifdef BASIC_TRON_IS_QUIT
 			beq *+5
 			jmp NotFound
-#endif
 
-			lda	#$ff
-			tay
-			jsr	SetByteRead
-			jsr	ReadUSBData3
+		SyncTape_loop:
 			jsr	GetTapeByte
-			ldx	#$00			; Sortir avec X=0 car utilisé en $E4B6 pour le Flag d'erreur
-			rts
+			cmp	#$16
+			bne	SyncTape_loop
 
-		ReadUSBData3:
-			lda	#$27
-			sta	CH376_COMMAND
-			lda	CH376_DATA
-			sta	PTR
+			; $03-1 pour pouvoir charger les .tap qui n'ont
+			; que 3x$16 au lieu de 4 minimum
+		        ldx     #$03 -1                         ; E74D A2 03
+		LE74F:
+		        jsr     GetTapeByte                     ; E74F 20 C9 E6
+		        cmp     #$16                            ; E752 C9 16
+		        bne     SyncTape                        ; E754 D0 DF
+		        dex                                     ; E756 CA
+		        bne     LE74F                           ; E757 D0 F6
 			rts
-		; E755
-#ifndef BASIC_TRON_IS_QUIT
-			nop
-			nop
-			nop
-			nop
-			nop
-#endif
+		.)
+
+
 	LE75A:
 	; WriteLeader
 
@@ -622,12 +733,536 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 ; 34 Octets
 ;---------------------------------------------------------------------------
-	new_patch(SetupTape,LE7AF)
+;	new_patch(SetupTape,LE7AF)
+;
+;		-SetupTape:
+;			jsr _SetupTape
+;	LE7AF:
 
-		-SetupTape:
-			; E76A - E781: 24 octets
-			;InitVIA
-			; Ok: 10/24 octets
+
+;---------------------------------------------------------------------------
+;  1 Octet : Patch pour CheckFoundName, retourne OK
+;---------------------------------------------------------------------------
+	new_patchl(CheckFoundName+4,1)
+		rts
+
+;---------------------------------------------------------------------------
+;  8 Octets : Patch routine existante
+;---------------------------------------------------------------------------
+	new_patchl($e93d,3)
+
+		LE93D:
+			; E93D - E945: 9 octets
+			; RestaureVIA
+			; En fait on ne change que l'intruction en $E93D
+			; Ok: 6/9 octets
+			jsr	_ClrTapeStatus
+		        ;jsr     ResetVIA                        ; E940 20 AA F9
+		        ;jmp     SetupTimer                      ; E943 4C E0 ED
+
+
+
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+;	jmp	$D4DA			; "?UNDEF'D FUNCTION ERROR"
+;
+;	ldx	#$D7
+;	jmp	$C47E			; "?CAN'T CONTINUE ERROR"
+
+;---------------------------------------------------------------------------
+;			Patch de la routine StartBASIC
+;---------------------------------------------------------------------------
+	new_patch((StartBASIC+$B7),LED86)
+		; jmp BackToBASIC
+		jmp ORIX_AUTOLOAD
+	LED86:
+
+
+;---------------------------------------------------------------------------
+;			Patch de la routine RamTest
+;---------------------------------------------------------------------------
+#ifdef NORAMCHECK
+	;
+	; Supprime le test de la RAM
+	; pour accélérer le démarrage
+	;
+	; Libère de $FA3C à $FA85 soit 74 octets
+	;
+	new_patch(RamTest,LFA86)
+			ldy	#$00
+			sty	RAMFAULT
+			sty	RAMSIZEFLAG
+			sty	$0500
+			sty	HIMEM_PTR
+			sty	HIMEM_MAX
+#ifdef CHECKRAM_16K
+			; Test 48Ko
+			dey
+			sty	$4500
+			lda	$0500
+			bne	LFA31
+#endif
+			lda	#$c0-$28
+#ifdef CHECKRAM_16K
+			bne	LFA36
+		LFA31:
+			; 16Ko seulement
+			inc	RAMSIZEFLAG
+			lda	#$40-$28
+#endif
+		LFA36:
+			sta	HIMEM_PTR+1
+			sta	HIMEM_MAX+1
+			rts
+	LFA3C:
+		ORIX_AUTOLOAD:
+			; InitCH376: inutile car fait pour le chargement
+			; du jeu de caractères
+			; jsr InitCH376
+
+			lda #<(BUFEDT+6)
+			sta TXTPTR
+			lda #>(BUFEDT+6)
+			sta TXTPTR+1
+			jsr CharGet
+			beq *+8
+			jsr CLOAD
+			jmp DoNextLine
+			jmp BackToBASIC
+
+#ifdef BASIC_QUIT
+		QUIT:
+			ldy	#$0C
+		boucle:
+			lda	BackToOrix,y
+			sta	$00,y
+			dey
+			bpl	boucle
+			jmp	$0000
+
+		BackToOrix:
+			sei
+			lda	#$07
+			sta	VIA2_IORA
+			sta	VIA2_DDRA
+			jmp	(RESET_VECTOR)
+#endif
+
+
+;#print *
+#if * > $fa86
+#print "*** ERROR NORAMCHECK too long"
+#endif
+		.dsb $fa86-*, $EA
+	LFA86:
+#endif
+
+
+
+;---------------------------------------------------------------------------
+;			Patch pour la gestion du joystick
+;			Placé dans le jeu de caractères
+;---------------------------------------------------------------------------
+#ifdef NO_CHARSET
+#ifdef JOYSTICK_DRIVER
+
+; Si Détournement de l'appel ReadKbdCol
+#ifdef JOYSTICK_READKBDCOL
+	new_patch(CharSet, CharSet_end)
+
+;---------------------------------------------------------------------------
+;		Patch pour le chargment du jeu de caractère par défaut
+;			Placé dans le jeu de caractères
+;---------------------------------------------------------------------------
+rwpoin = $00f3		; PTR
+;H91 = rwpoin
+ERR_OPEN_DIR=$41
+
+		; Spécial pour The Hobbit qui vérifie la valeur en $FC78
+		; pour savoir si il s'agit d'un Oric-1 ou d'un Atmos
+		.byte $00
+
+		default_chs_len:
+			.byte default_chs_end-default_chs-1
+		default_chs:
+			.byte DEFAULT_CHARSET,0
+		default_chs_end:
+
+		;---------------------------------------------------------------------------
+		; load_charset
+		;---------------------------------------------------------------------------
+		; Charge un le jeu de caractère par défaut en RAM
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	AY: Code erreur CH376 ($41 si Ok)
+		;
+		; Modifie:
+		;	rwpoin: Pointeur vers l'adresse de chargement
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	open_fqn
+		;	GetTapeData
+		;---------------------------------------------------------------------------
+		load_charset:
+		.(
+			; Ouverture du fichier
+			ldx default_chs_len
+			lda #<default_chs
+			ldy #>default_chs
+			jsr open_fqn
+			bne load_charset_error
+
+			; Adresse de chargement
+			lda #<$b500
+			ldy #>$b500
+			sta PROGSTART
+			sty PROGSTART+1
+
+			; Adresse de fin
+			lda #<($b500+$300)
+			ldy #<($b500+$300)
+			sta PROGEND
+			sty PROGEND+1
+
+			; Chargement du jeux de caractères
+			jsr GetTapeData
+
+		load_charset_error:
+			rts
+		.)
+
+
+
+		;---------------------------------------------------------------------------
+		; open_fqn
+		;---------------------------------------------------------------------------
+		; Ouvre un fichier (chemin absolu ou relatif sans ../)
+		;
+		; Entree:
+		;	AY: Adresse de la chaine
+		;	X: Longueur de la chaine
+		;
+		; Sortie:
+		;	AY: Code erreur CH376 ($41 si Ok)
+		;	rwpoin: Adresse de la chaine
+		;
+		; Modifie:
+		;	INTTMP: Longueur de la chaine (remis à sa valeur initiale en fin de procédure)
+		;	INTTMP+1: Index dans la chaine (remis à sa valeur initiale en fin de procédure)
+		;	rwpoin: Adresse de la chaine
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	InitCH376
+		;	FileOpen
+		;---------------------------------------------------------------------------
+		open_fqn:
+		.(
+			; Sauvegarde la longueur de la chaine, le temps
+			; de mettre à l'abri $F5 et $F6
+;			tay
+
+			; Sauvegarde $F5 et $F6 car utilisés par le Joystick
+;			lda rwpoin+2
+;			pha
+;			lda rwpoin+3
+;			pha
+
+
+			sta rwpoin
+			sty rwpoin+1
+
+			; Longueur de la chaîne
+			stx INTTMP
+										; rwpoin+3 = 0;
+			lda #0
+			sta INTTMP+1
+			; Note: InitCH376 fait un Mount USB qui replace le répertoire par
+			; defaut a '/'
+			; A modifier pour autoriser un repertoire relatif
+										; CALL InitCH376;
+			jsr InitCH376
+										; IF .Z THEN
+			bne ZZ1002
+										; BEGIN;
+			; La suite est faite dans InitCH376 de la rom
+			;jsr SetSD
+			;nop
+			;nop
+			;jsr Mount
+			;bne ZZ1002
+
+			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+										; IF &rwpoin = '/' THEN
+			ldy #0
+			lda #'/'
+			cmp (rwpoin),Y
+			beq  *+5
+			jmp ZZ1003
+										; BEGIN;
+			; Apres le test, .A contient '/' soit $2F
+										; CH376_COMMAND = .A; " SetFirwpoin+2ame";
+			sta CH376_COMMAND
+										; CH376_DATA = .A;
+			sta CH376_DATA
+										; CH376_DATA = $00;
+			lda #$00
+			sta CH376_DATA
+										; CALL FileOpen; " Detruit X et Y";
+			jsr FileOpen
+										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
+			cmp #ERR_OPEN_DIR
+			bne CD_End
+										; INC rwpoin+3;
+			inc INTTMP+1
+										; END;
+										; IF rwpoin+3 < rwpoin+2 THEN CH376_COMMAND = $2F; " SetFirwpoin+2ame";
+		ZZ1003:
+			lda INTTMP
+			cmp INTTMP+1
+			beq  *+4
+			bcs  *+5
+			jmp ZZ1004
+			lda #$2F
+			sta CH376_COMMAND
+		ZZ1004:
+			; Remplacer BCC *+5/JMP ZZnnnnn par BCS ZZnnnnn
+										; WHILE rwpoin+3 < rwpoin+2
+		ZZ1005:
+			lda INTTMP+1
+			cmp INTTMP
+			bcc  *+5
+			jmp ZZ0006
+										; DO;
+			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+			; IF &rwpoin[rwpoin+3] = '/' THEN
+										; .Y = rwpoin+3;
+			ldy INTTMP+1
+										; .A = @rwpoin[.Y];
+			lda (rwpoin),Y
+			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
+										; IF .A = '/' THEN
+			cmp #'/'
+			beq  *+5
+			jmp ZZ0007
+										; BEGIN;
+										; CH376_DATA = 0;
+			lda #0
+			sta CH376_DATA
+										; CALL FileOpen;
+			jsr FileOpen
+										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
+			cmp #ERR_OPEN_DIR
+			bne CD_End
+										; INC rwpoin+3;
+			inc INTTMP+1
+											; IF rwpoin+3 < rwpoin+2 THEN CH376_COMMAND = $2F; " SetFirwpoin+2ame";
+			lda INTTMP
+			cmp INTTMP+1
+			beq  *+4
+			bcs  *+5
+			jmp ZZ0008
+			lda #$2F
+			sta CH376_COMMAND
+		ZZ0008:
+										; .Y = rwpoin+3;
+			ldy INTTMP+1
+										; .A = @rwpoin[.Y];
+			lda (rwpoin),Y
+										; END;
+										; CH376_DATA = .A;
+		ZZ0007:
+			sta CH376_DATA
+										; INC rwpoin+3;
+			inc INTTMP+1
+										; END;
+			jmp ZZ1005
+		ZZ0006:
+										; CH376_DATA = $00;
+			lda #$00
+			sta CH376_DATA
+										; CALL FileOpen;
+			jsr FileOpen
+										; CD_End:
+		CD_End
+										; END;
+			; .AY = Code erreur, poids faible dans .A
+		ZZ1002:
+										; .Y = .A;
+			tay
+										; CLEAR .A;
+			; Restaure $F5 et $F6
+;			pla
+;			sta rwpoin+3
+;			pla
+;			sta rwpoin+2
+
+			lda #0
+										;RETURN;
+			rts
+		.)
+
+
+		;---------------------------------------------------------------------------
+		; SetByteReadWrite
+		;---------------------------------------------------------------------------
+		; Calcule la taille du programme et effectue un SetByteRead ou SetByteWrite
+		;
+		; Entree:
+		;	SetByteReadWrite: SetByteRead
+		;	SetByteReadWrite+1: SetByteWrite
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;	X: Modifié
+		;	Y: Modifié
+		;
+		; Modifie:
+		;	-
+		; Utilise:
+		;	PROGSTART: Adresse de début du programme
+		;	PROGEND: Adresse de fin du programme
+		;
+		; Sous-routines:
+		;	SetByteRead
+		;	SetByteWrite
+		;---------------------------------------------------------------------------
+		SetByteReadWrite
+		.(
+			sec				; Point d'entrée pour une lecture
+			.byte $24
+			clc				; Point d'entrée pour une écriture
+
+			php				; Sauvegarde P pour plus tard
+
+		_CalcPgmLength:
+			sec				; Calcule la taille du programme
+			lda	PROGEND
+			sbc	PROGSTART
+			tax
+
+			lda	PROGEND+1
+			sbc	PROGSTART+1
+			tay
+
+		_WriteLength:
+			inx				; +1
+			bne	*+3
+			iny
+
+			txa
+
+			plp
+			bcc *+5
+			jmp SetByteRead
+			jmp SetByteWrite
+		.)
+
+		;---------------------------------------------------------------------------
+		; ReadUSBData
+		;---------------------------------------------------------------------------
+		; Charge un bloc en mémoire
+		;
+		; Entree:
+		;	AY: Adresse de chargement
+		;
+		; Sortie:
+		;	A: Modifié
+		;	X: 0
+		;	Y: Nombre d'octets lus
+		;
+		; Modifie:
+		;	INTTMP: Pointeur vers l'adresse de chargement
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	-
+		;---------------------------------------------------------------------------
+		ReadUSBData:
+		.(
+			; On peut supprimer les sta/sty si on supprime les lda/ldy de load_data
+			; et que INTTMP est à jour avant l'appel
+ 		        sta INTTMP
+		        sty INTTMP+1
+
+ 		ReadUSBData2:
+ 		        ldy #0
+
+		        lda #$27
+		        sta CH376_COMMAND
+		        ldx CH376_DATA
+
+		        beq ZZZ002
+
+		ZZZ003:
+		        lda CH376_DATA
+		        sta (INTTMP),Y
+		        iny
+		        dex
+		        bne ZZZ003
+
+		ZZZ002:
+		        rts
+		.)
+
+
+		;---------------------------------------------------------------------------
+		; ReadUSBData3
+		;---------------------------------------------------------------------------
+		; Lit un caractère depuis la K7
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Caractère lu
+		;	$2f: Caractère lu
+		;
+		; Modifie:
+		;	$2f: Caractère lu
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	-
+		;---------------------------------------------------------------------------
+                ReadUSBData3:
+                .(
+			; On lit 1 caractère
+			lda	#$01
+			ldy	#$00
+			jsr	SetByteRead
+			bne	fin_erreur
+
+;			jsr	ReadUSBData3			; Résultat dans $2f
+;			jsr	ByteRdGo
+;			bne	fin
+
+                        lda     #$27
+                        sta     CH376_COMMAND
+			lda	CH376_DATA			; Nombre de caractère à lire
+                        lda     CH376_DATA			; Caractère lu
+                        sta     $2f
+		fin_erreur:
+                        rts
+		.)
+
+
+		_ClrTapeStatus:
+			jsr	ClrTapeStatus
+			lda	#$01			; Fermeture avec mise à jour de la taille
+			jmp	FileClose
+
+
+;		_SetupTape:
+;			jsr	StopTimer
 
 		InitCH376:
 		Exists:
@@ -691,129 +1326,57 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; Efface la ligne de status + 'OUT OF DATA ERROR'
 		; Utilisé pour indiquer une erreur lors de la lecure d'un fichier
-		LE790:
+		_FileNotFound:
 		; E7A9
 			jsr LE93D
-			jmp $d35c
+;			jmp $d35c
+			; Reprend le début de PrintErrorX
+		        jsr     SetScreen                       ; C47E 20 2F C8
+		        lsr     KBD_flag                        ; C481 46 2E
+		        jsr     NewLine                         ; C483 20 F0 CB
+		        jsr     LCCD7                           ; C486 20 D7 CC
+
+			lda #<FileNotFound_msg
+			ldy #>FileNotFound_msg
+			jsr PrintString
+			; Retour à PrintErrorX
+			jmp LC496
+
+		FileNotFound_msg
+			.byte "FILE NOT FOUND",00
 ;			nop
 ;			nop
 ;			nop
 ;			nop
 ;			nop
 ;			nop
-	LE7AF:
 
-
-;---------------------------------------------------------------------------
-;  8 Octets : Patch routine existante
-;---------------------------------------------------------------------------
-	new_patch($e93d,LE946)
-
-		LE93D:
-			; E93D - E945: 9 octets
-			; RestaureVIA
-			; En fait on ne change que l'intruction en $E940
-			; Ok: 6/9 octets
-			jsr	ClrTapeStatus
-			lda	#$01			; Fermeture avec mise à jour de la taille
-			jmp	FileClose
-		; E945
-			nop
-	LE946:
-		; CALL
-
-
-
-;---------------------------------------------------------------------------
-;---------------------------------------------------------------------------
-;	jmp	$D4DA			; "?UNDEF'D FUNCTION ERROR"
-;
-;	ldx	#$D7
-;	jmp	$C47E			; "?CAN'T CONTINUE ERROR"
-
-;---------------------------------------------------------------------------
-;			Patch de la routine StartBASIC
-;---------------------------------------------------------------------------
-	new_patch((StartBASIC+$B7),LED86)
-		; jmp BackToBASIC
-		jmp ORIX_AUTOLOAD
-	LED86:
-
-
-;---------------------------------------------------------------------------
-;			Patch de la routine RamTest
-;---------------------------------------------------------------------------
-#ifdef NORAMCHECK
-	;
-	; Supprime le test de la RAM
-	; pour accélérer le démarrage
-	;
-	; Libère de $FA3C à $FA85 soit 74 octets
-	;
-	new_patch(RamTest,LFA86)
-			ldy	#$00
-			sty	RAMFAULT
-			sty	RAMSIZEFLAG
-			sty	$0500
-			sty	HIMEM_PTR
-			sty	HIMEM_MAX
-#ifdef CHECKRAM_16K
-			; Test 48Ko
-			dey
-			sty	$4500
-			lda	$0500
-			bne	LFA31
-#endif
-			lda	#$c0-$28
-#ifdef CHECKRAM_16K
-			bne	LFA36
-		LFA31:
-			; 16Ko seulement
-			inc	RAMSIZEFLAG
-			lda	#$40-$28
-#endif
-		LFA36:
-			sta	HIMEM_PTR+1
-			sta	HIMEM_MAX+1
-			rts
-	LFA3C:
-		ORIX_AUTOLOAD:
-			lda #<(BUFEDT+6)
-			sta TXTPTR
-			lda #>(BUFEDT+6)
-			sta TXTPTR+1
-			jsr CharGet
-			beq *+5
-			jmp CLOAD
-			jmp BackToBASIC
-
-#ifdef BASIC_QUIT
-		QUIT:
-			ldy	#$0C
-		boucle:
-			lda	BackToOrix,y
-			sta	$00,y
-			dey
-			bpl	boucle
-			jmp	$0000
-
-		BackToOrix:
-			sei
-			lda	#$07
-			sta	VIA2_IORA
-			sta	VIA2_DDRA
-			jmp	(RESET_VECTOR)
-#endif
-
-#ifdef JOYSTICK_DRIVER
-VIA2_IORB=$320
-; Si Détournement en CheckKbd
-#ifndef USE_CHECKKBD
+		;---------------------------------------------------------------------------
+		; CheckJoystick
+		;---------------------------------------------------------------------------
+		; Scrute le Joystick
+		;
+		; Entrée:
+		;	A: ($208) & $87 'N° de ligne de la dernière touche appuyée)
+		;	X: ($020A)
+		;	Y: -
+		;	$0208: Code dernière touche appuyée
+		;	$020A: Colonne dernière touche appuyée (pour vérification)
+		;	$0210: ($0208) & $87
+		;
+		; Sortie:
+		;	A:
+		;	X:
+		;	Y:
+		;	$0208:
+		;	$020A:
+		;	$0210: Colonne touche actuellement appuyée
+		;
+		; Appel: jsr xxx (remplace le jsr ReadKbdCol)
+		;---------------------------------------------------------------------------
 		CheckJoystick:
-			lda $02df
-			bpl *+3
-			rts
-			;ldx #$00		; Si on peut modifier X
+		.(
+			; Ne pas modifier A et X pour pouvoir appeler ReadKbdCol
 			ldy #$00		; Si on peut modifier Y
 			lda VIA2_IORB		; 35 Octets
 			and #$1f
@@ -826,147 +1389,80 @@ VIA2_IORB=$320
 			lsr
 			bcc down
 			lsr
-		;	bcc up
-		;	rts
-			bcs CheckJoystick+5
-#else
-ReadKbd = $f495
-		CheckJoystick:
-			pha
-			ldx #$ff		; Si on peut modifier Y
-			lda VIA2_IORB		; 35 Octets
-			and #$1f
-			lsr
-			bcc right
-			lsr
-			bcc left
-			lsr
-			bcc fire
-			lsr
-			bcc down
-			lsr
 			bcc up
+		retour
+			lda $0208		; Instruction supprimée de ReadKbd
+			rts			; Retour à ReadKbd
+
+		up
+			iny
+		fire
+			iny
+		left
+			iny
+		right
+			iny
+		down
+			lda JOY_TBL,y		; La table doit contenir le code de la touche
+			; Tester si il s'agit de la même direction
+			; Si oui -> rts possible
+			; Si non -> initialiser $020E, mettre à jour $0208 et $020A puis retour à faire en LF4C6
+			bpl retour		; Si la touche n'est pas définie, on repart vers ReadKbd
+			;beq retour		; Si la touche n'est pas définie, on repart vers ReadKbd
+			;ora $80		; b7=1 pour indiquer qu'une touche est appuyée
+			cmp $0208
+			bne autre_direction
+			tay
+			pla			; Oublie l'adresse de retour
 			pla
-			jmp ReadKbd
-		up
-			inx
-		right
-			inx
-		left
-			inx
-		fire
-			inx
-		down
-			inx
-			lda $00,x
-			beq up-4
-			tax
+			tya
+			jmp ReadKbd+26		; Retour, gestion répétition
+
+			; calculer le masque pour la colonne et le mettre dans $020A
+		autre_direction
+			;ora $80		; b7=1 pour indiquer qu'une touche est appuyée
+			sta $0208		; Sauvegarde le code de la touche dans $0208
+
+			; On calcule le masque pour la ligne
+			; correspondant à la touchr
+			and #$07		; N° de ligne de la touche
+			tay			; Sert de compteur
+			iny
+
+			clc
+			lda #$ff
+		loop
+			rol
+			dey
+			bne loop
+			sta $210		; Masque de la ligne dans $0210
+
+			lda $024e		; Initialise le compteur pour la répétition
+			sta $020e
+
+			pla			; Oublie l'adresse de retour
 			pla
-			rts
+
+			lda $0208		; Replace le code de la touche dans A
+
+			jmp LF4C6		; Retour à ReadKbd
+
+		.)
+
+CharSet_end:
+
+#if * > KeyCodeTab
+#print "*** ERROR Charset too long"
 #endif
-#if 0
-; Valeurs Fixes
-		up
-			lda #'U'+$80
-			rts
-		right
-			lda #'R'+$80
-			rts
-		left
-			lda #'L'+$80
-			rts
-		fire
-			lda #'F'+$80
-			rts
-		down
-			lda #'D'+$80
-			rts
+;			.dsb KeyCodeTab-*,$ff
+
+		; #ifdef JOYSTICK_DRIVER
+#endif
+	; #ifdef JOYSTICK_READKBDCOL
 #endif
 
-#if 0
-; valeurs dans une table
-; (15 octets)
-		up
-			lda $00
-			rts
-		right
-			lda $01
-			rts
-		left
-			lda $02
-			rts
-		fire
-			lda $03
-			rts
-		down
-			lda $04
-			rts
+; #ifdef NO_CHARSET
 #endif
-
-#if 0
-; valeurs dans une table (version optimisée)
-; A condition de pouvoir modifier X
-; 7 Octets +2
-		up
-			inx
-		right
-			inx
-		left
-			inx
-		fire
-			inx
-		down
-			inx
-			lda $00,x
-			rts
-#endif
-
-#if 0
-; valeurs dans une table (version optimisée)
-; A condition de pouvoir modifier Y
-; 7 Octets +2
-		up
-			; iny
-		right
-			iny
-		left
-			iny
-		fire
-			iny
-		down
-			iny
-			lda $00,y
-			rts
-#endif
-
-; Si Détournement en CheckKbd
-#if 1
-; valeurs dans une table (version optimisée)
-; A condition de pouvoir modifier Y
-; 7 Octets +2
-		up
-			iny
-		fire
-			iny
-		left
-			iny
-		right
-			iny
-		down
-			lda $00,y
-			rts
-#endif
-
-#endif
-
-;#print *
-#if * > $fa86
-#print "*** ERROR NORAMCHECK too long"
-#endif
-		.dsb $fa86-*, $EA
-	LFA86:
-#endif
-
 ;---------------------------------------------------------------------------
 ;			Personnalisation de la ROM
 ;---------------------------------------------------------------------------
@@ -1055,6 +1551,7 @@ ReadKbd = $f495
 
 	;---------------------------------------------------------------------------
 	; 9 octets disponibles de $CD16 à $CD1E inclus
+	; Peut être transféré vers _FileNotFound
 	;---------------------------------------------------------------------------
 	new_patch(TRON, LCD1F)
 		NotFound:
@@ -1067,7 +1564,7 @@ ReadKbd = $f495
 			; php
 			pla
 
-			jmp LE790
+			jmp _FileNotFound
 			nop
 		LCD1F
 #endif
@@ -1085,9 +1582,30 @@ ReadKbd = $f495
 	;---------------------------------------------------------------------------
 	; Patch pour de la routine CheckKbd
 	;---------------------------------------------------------------------------
+#ifdef JOYSTICK_CHECKKBD
+#echo "Joystick driver: ChekKbd"
 	new_patchl(CheckKbd,3)
 ;	new_patchl($EE62,3)
 		jsr CheckJoystick
+#else
+
+#ifdef JOYSTICK_READKBDCOL
+#echo "Joystick driver: ReadKbdCol"
+	; Patch de la routine CheckKbd
+	new_patchl(ReadKbd+5,3)
+		jsr CheckJoystick
+
+	; Patche de la routine d'init pour ne pas
+	; copier le jeu de caractères depuis la rom vers la ram.
+	; On suppose que l'Oric a déjà démarré et que le jeu est en place
+	new_patchl(LF8B8+26,3)
+	;nop
+	;nop
+	;nop
+	jsr load_charset
+#endif
+
+#endif
 
 	;---------------------------------------------------------------------------
 	; Patch pour l'instruction GET

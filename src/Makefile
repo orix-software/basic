@@ -84,6 +84,13 @@ endif
 
 
 
+ifneq ($(CHARSET),)
+	CHARSET :=  $(shell echo $(CHARSET) | tr a-z A-Z)
+	ASFLAGS += -DDEFAULT_CHARSET='"/USR/SHARE/FONTS/$(CHARSET)"'
+endif
+
+
+
 ifneq ($(COPYRIGHT_MSG),)
 	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
 else
