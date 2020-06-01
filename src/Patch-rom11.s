@@ -190,6 +190,7 @@ LCCD7           = $ccd7
 
 TRON            = $cd16
 
+TapeSync        = $e4ac
 GetTapeData     = $e4e0
 
 ClrTapeStatus   = $e5f5
@@ -202,7 +203,7 @@ SetupTape       = $e76a
 CheckFoundName  = $e790
 
 CLOAD           = $e85b
-
+LE93D           = $e93d
 CheckKbd        = $eb78
 
 StopTimer       = $ee1a
@@ -273,8 +274,8 @@ RESET_VECTOR    = $fffc
 		OpenTapeWrite:
 			;lda #<PROGNAME			; Forcé dans SetFilename2
 			;ldy #>PROGNAME
-			jsr	SetFilename2
-			jsr	FileCreate
+			jsr	OpenForWrite
+			;jsr	FileCreate
 
 			lda	$2f			; longueur du nom sans le 0 final, d'où le +1
 			clc
@@ -380,8 +381,6 @@ RESET_VECTOR    = $fffc
 			dey
 			bne	ZZZ009
 			rts
-			nop
-			nop
 		.)
 		;---------------------------------------------------------------------------
 		; Version sans Timeout: 14 Octets
@@ -452,6 +451,11 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 ;				CLOAD
 ;---------------------------------------------------------------------------
+	;---------------------------------------------------------------------------
+	; Patch l'appel à SyncTape pour détecter l'appel direct
+	;---------------------------------------------------------------------------
+	new_patchl(TapeSync,3)
+		jsr SyncTape+3
 
 
 	new_patch(GetTapeData,LE50A)
@@ -566,7 +570,6 @@ RESET_VECTOR    = $fffc
 		.(
 			;sta PTR_READ_DEST
 			;sty PTR_READ_DEST+1
-
 			lda	#$2f
 			sta	CH376_COMMAND
 			sta	CH376_DATA		; Pour ouverture de '/'
@@ -577,6 +580,15 @@ RESET_VECTOR    = $fffc
 			lda	PROGNAME,y
 			beq	ZZ0004
 
+			sta	CH376_DATA
+			bne	ZZ0003
+
+		ZZ0004:
+			sty	$2f			; Sauvegarde la longueur (utilisée par CSAVE)
+			ldy	#$ff			; Ajoute '.TAP'
+		ZZ0005:
+			iny
+			lda	ZZD001,y
 #ifdef FORCE_UPPERCASE
 			; Force le nom du fichier .tap en majuscules
 		        cmp     #'a'
@@ -587,16 +599,8 @@ RESET_VECTOR    = $fffc
 		bk2
 #endif
 			sta	CH376_DATA
-			bne	ZZ0003
-
-		ZZ0004:
-			sty	$2f			; Sauvegarde la longueur (utilisée par CSAVE)
-			ldy	#$ff			; Ajoute '.TAP'
-		ZZ0005:
-			iny
-			lda	ZZD001,y
-			sta	CH376_DATA
 			bne	ZZ0005
+		fin
 			rts
 		.)
 
@@ -665,6 +669,9 @@ RESET_VECTOR    = $fffc
 			cmp	#INT_DISK_WRITE
 			rts
 
+		;---------------------------------------------------------------------------
+		; 10 Octets
+		;---------------------------------------------------------------------------
 		WriteLeader2:
 			jsr	SetByteAndWrite
 			jsr	WriteLeader		; Ecriture de l'amorce
@@ -692,13 +699,19 @@ RESET_VECTOR    = $fffc
 		.(
 			; Il faut vérifier si on à déjà ouvert un fichier ou non
 			; pour le multitap
-			jsr	SetFilename2
-			jsr	FileOpen
+			jmp SyncTape_loop			; Point d'entrée direct
+			jsr OpenForRead			; Point d'entrée depuis TapeSync
+			;jsr	SetFilename2
+			;jsr	FileOpen
 			beq *+5
+		SyncTape_error:
 			jmp NotFound
 
 		SyncTape_loop:
 			jsr	GetTapeByte
+			; Tester C=1
+			bcs SyncTape_error
+		suite:
 			cmp	#$16
 			bne	SyncTape_loop
 
@@ -707,6 +720,7 @@ RESET_VECTOR    = $fffc
 		        ldx     #$03 -1                         ; E74D A2 03
 		LE74F:
 		        jsr     GetTapeByte                     ; E74F 20 C9 E6
+			; Tester C=1?
 		        cmp     #$16                            ; E752 C9 16
 		        bne     SyncTape                        ; E754 D0 DF
 		        dex                                     ; E756 CA
@@ -749,16 +763,16 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 ;  8 Octets : Patch routine existante
 ;---------------------------------------------------------------------------
-	new_patchl($e93d,3)
-
-		LE93D:
-			; E93D - E945: 9 octets
-			; RestaureVIA
-			; En fait on ne change que l'intruction en $E93D
-			; Ok: 6/9 octets
-			jsr	_ClrTapeStatus
-		        ;jsr     ResetVIA                        ; E940 20 AA F9
-		        ;jmp     SetupTimer                      ; E943 4C E0 ED
+;	new_patchl($e93d,3)
+;
+;		LE93D:
+;			; E93D - E945: 9 octets
+;			; RestaureVIA
+;			; En fait on ne change que l'intruction en $E93D
+;			; Ok: 6/9 octets
+;			jsr	_ClrTapeStatus
+;		        ;jsr     ResetVIA                        ; E940 20 AA F9
+;		        ;jmp     SetupTimer                      ; E943 4C E0 ED
 
 
 
@@ -786,40 +800,43 @@ RESET_VECTOR    = $fffc
 	; Supprime le test de la RAM
 	; pour accélérer le démarrage
 	;
-	; Libère de $FA3C à $FA85 soit 74 octets
+	; Libère de $FA2C à $FA85 soit 90 octets
 	;
 	new_patch(RamTest,LFA86)
+			; 24 octets
 			ldy	#$00
 			sty	RAMFAULT
 			sty	RAMSIZEFLAG
 			sty	$0500
 			sty	HIMEM_PTR
 			sty	HIMEM_MAX
-#ifdef CHECKRAM_16K
-			; Test 48Ko
-			dey
-			sty	$4500
-			lda	$0500
-			bne	LFA31
-#endif
+;#ifdef CHECKRAM_16K
+;			; Test 48Ko
+;			dey
+;			sty	$4500
+;			lda	$0500
+;			bne	LFA31
+;#endif
 			lda	#$c0-$28
-#ifdef CHECKRAM_16K
-			bne	LFA36
-		LFA31:
-			; 16Ko seulement
-			inc	RAMSIZEFLAG
-			lda	#$40-$28
-#endif
+;#ifdef CHECKRAM_16K
+;			bne	LFA36
+;		LFA31:
+;			; 16Ko seulement
+;			inc	RAMSIZEFLAG
+;			lda	#$40-$28
+;#endif
 		LFA36:
 			sta	HIMEM_PTR+1
 			sta	HIMEM_MAX+1
 			rts
 	LFA3C:
+		; 27 octets
 		ORIX_AUTOLOAD:
 			; InitCH376: inutile car fait pour le chargement
 			; du jeu de caractères
 			; jsr InitCH376
-
+			lda #$00
+			sta $020f
 			lda #<(BUFEDT+6)
 			sta TXTPTR
 			lda #>(BUFEDT+6)
@@ -831,6 +848,7 @@ RESET_VECTOR    = $fffc
 			jmp BackToBASIC
 
 #ifdef BASIC_QUIT
+		; 25 octets (13+12)
 		QUIT:
 			ldy	#$0C
 		boucle:
@@ -848,7 +866,7 @@ RESET_VECTOR    = $fffc
 			jmp	(RESET_VECTOR)
 #endif
 
-
+	RAMCHECK_end:
 ;#print *
 #if * > $fa86
 #print "*** ERROR NORAMCHECK too long"
@@ -868,7 +886,7 @@ RESET_VECTOR    = $fffc
 
 ; Si Détournement de l'appel ReadKbdCol
 #ifdef JOYSTICK_READKBDCOL
-	new_patch(CharSet, CharSet_end)
+	new_patch((CharSet+$18), CharSet_end)
 
 ;---------------------------------------------------------------------------
 ;		Patch pour le chargment du jeu de caractère par défaut
@@ -880,8 +898,9 @@ ERR_OPEN_DIR=$41
 
 		; Spécial pour The Hobbit qui vérifie la valeur en $FC78
 		; pour savoir si il s'agit d'un Oric-1 ou d'un Atmos
-		.byte $00
+		;.byte $00
 
+		; $fc90-$fcad: 30 octets
 		default_chs_len:
 			.byte default_chs_end-default_chs-1
 		default_chs:
@@ -889,7 +908,7 @@ ERR_OPEN_DIR=$41
 		default_chs_end:
 
 		;---------------------------------------------------------------------------
-		; load_charset
+		; load_charset (36 octets)
 		;---------------------------------------------------------------------------
 		; Charge un le jeu de caractère par défaut en RAM
 		;
@@ -908,6 +927,7 @@ ERR_OPEN_DIR=$41
 		;	open_fqn
 		;	GetTapeData
 		;---------------------------------------------------------------------------
+		; $fcae
 		load_charset:
 		.(
 			; Ouverture du fichier
@@ -939,7 +959,7 @@ ERR_OPEN_DIR=$41
 
 
 		;---------------------------------------------------------------------------
-		; open_fqn
+		; open_fqn (127 octets)
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier (chemin absolu ou relatif sans ../)
 		;
@@ -962,6 +982,7 @@ ERR_OPEN_DIR=$41
 		;	InitCH376
 		;	FileOpen
 		;---------------------------------------------------------------------------
+		; $fcd2
 		open_fqn:
 		.(
 			; Sauvegarde la longueur de la chaine, le temps
@@ -1003,8 +1024,9 @@ ERR_OPEN_DIR=$41
 			ldy #0
 			lda #'/'
 			cmp (rwpoin),Y
-			beq  *+5
-			jmp ZZ1003
+			;beq  *+5
+			;jmp ZZ1003
+			bne ZZ1003
 										; BEGIN;
 			; Apres le test, .A contient '/' soit $2F
 										; CH376_COMMAND = .A; " SetFirwpoin+2ame";
@@ -1037,8 +1059,9 @@ ERR_OPEN_DIR=$41
 		ZZ1005:
 			lda INTTMP+1
 			cmp INTTMP
-			bcc  *+5
-			jmp ZZ0006
+			;bcc  *+5
+			;jmp ZZ0006
+			bcs ZZ0006
 										; DO;
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
 			; IF &rwpoin[rwpoin+3] = '/' THEN
@@ -1049,8 +1072,9 @@ ERR_OPEN_DIR=$41
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
 										; IF .A = '/' THEN
 			cmp #'/'
-			beq  *+5
-			jmp ZZ0007
+			;beq  *+5
+			;jmp ZZ0007
+			bne ZZ0007
 										; BEGIN;
 										; CH376_DATA = 0;
 			lda #0
@@ -1110,7 +1134,7 @@ ERR_OPEN_DIR=$41
 
 
 		;---------------------------------------------------------------------------
-		; SetByteReadWrite
+		; SetByteReadWrite (33 octets)
 		;---------------------------------------------------------------------------
 		; Calcule la taille du programme et effectue un SetByteRead ou SetByteWrite
 		;
@@ -1133,6 +1157,7 @@ ERR_OPEN_DIR=$41
 		;	SetByteRead
 		;	SetByteWrite
 		;---------------------------------------------------------------------------
+		; $fd51
 		SetByteReadWrite
 		.(
 			sec				; Point d'entrée pour une lecture
@@ -1165,7 +1190,7 @@ ERR_OPEN_DIR=$41
 		.)
 
 		;---------------------------------------------------------------------------
-		; ReadUSBData
+		; ReadUSBData(26 octets)
 		;---------------------------------------------------------------------------
 		; Charge un bloc en mémoire
 		;
@@ -1214,7 +1239,7 @@ ERR_OPEN_DIR=$41
 
 
 		;---------------------------------------------------------------------------
-		; ReadUSBData3
+		; ReadUSBData3 (26 octets)
 		;---------------------------------------------------------------------------
 		; Lit un caractère depuis la K7
 		;
@@ -1250,20 +1275,46 @@ ERR_OPEN_DIR=$41
 			lda	CH376_DATA			; Nombre de caractère à lire
                         lda     CH376_DATA			; Caractère lu
                         sta     $2f
+			clc					; Indique pas d'erreur de lecture
+			.byte $24
 		fin_erreur:
+			sec
                         rts
 		.)
 
 
-		_ClrTapeStatus:
-			jsr	ClrTapeStatus
-			lda	#$01			; Fermeture avec mise à jour de la taille
-			jmp	FileClose
+;		_ClrTapeStatus:
+;			jsr	ClrTapeStatus
+;; ---HCL---
+;			rts
+;; ---HCL---
+;			lda	#$01			; Fermeture avec mise à jour de la taille
+;			jmp	FileClose
 
 
 ;		_SetupTape:
 ;			jsr	StopTimer
 
+		;---------------------------------------------------------------------------
+		; InitCH376 (36 Octets)
+		;---------------------------------------------------------------------------
+		; Initialisation du CH376
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;
+		; Modifie:
+		;	-
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	Mount
+		;	$D4DA: ?UNDEF'D FUNCTION ERROR
+		;---------------------------------------------------------------------------
 		InitCH376:
 		Exists:
 			ldx	#6
@@ -1298,8 +1349,6 @@ ERR_OPEN_DIR=$41
 
 		;---------------------------------------------------------------------------
 		; 27 Octets
-		; ATTENTION: Déborde sur la routine "Comparer nom demandé et nom trouvé"
-		; en $E790 - $E7AE, d'ou le patch de la routine $E4AC
 		;---------------------------------------------------------------------------
 		SetByteRead:
 			ldx	#$3a
@@ -1324,6 +1373,8 @@ ERR_OPEN_DIR=$41
 			bne	CH376_CmdWait2
 
 		;---------------------------------------------------------------------------
+		; (24 octets)
+		;
 		; Efface la ligne de status + 'OUT OF DATA ERROR'
 		; Utilisé pour indiquer une erreur lors de la lecure d'un fichier
 		_FileNotFound:
@@ -1342,6 +1393,7 @@ ERR_OPEN_DIR=$41
 			; Retour à PrintErrorX
 			jmp LC496
 
+		; Message d'erreur (15 octets)
 		FileNotFound_msg
 			.byte "FILE NOT FOUND",00
 ;			nop
@@ -1352,7 +1404,130 @@ ERR_OPEN_DIR=$41
 ;			nop
 
 		;---------------------------------------------------------------------------
-		; CheckJoystick
+		; OpenForRead (17 octets)
+		;---------------------------------------------------------------------------
+		; Ouvre un fichier en lecture
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;
+		; Modifie:
+		;	$020f: Flag fichier ouvert
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	SetFilename2
+		;	FileOpen
+		;---------------------------------------------------------------------------
+#if 1
+		OpenForRead:
+		.(
+			lda PROGNAME
+			beq fin
+			jsr SetFilename2
+			lda #$42
+			sta $020f
+			jmp	FileOpen
+
+		fin:
+			rts
+		.)
+
+#endif
+#if 0
+		OpenForRead:
+		.(
+			lda $020f
+			cmp #$42
+			bne *+3
+			rts
+			jsr SetFilename2
+			lda #$42
+			sta $020f
+			jmp	FileOpen
+
+		fin:
+			rts
+		.)
+#endif
+#if 0
+		OpenForRead:
+		.(
+			bit $020f
+			bmi fin
+			bvs suite
+			lda #$20
+			sta $020f
+		suite
+			asl $020f
+			jsr SetFilename2
+			jsr FileOpen
+			rts
+		fin:
+			asl $020f
+			lda #$ff
+			rts
+		.)
+#endif
+
+		;---------------------------------------------------------------------------
+		; OpenForWrite ( 23 octets)
+		;---------------------------------------------------------------------------
+		; Ouvre un fichier en écriture
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;
+		; Modifie:
+		;	$020f: Flag fichier ouvert
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	FileClose
+		;	SetFilename2
+		;	FileCreate
+		;---------------------------------------------------------------------------
+		OpenForWrite:
+		.(
+			lda $020f
+			cmp #$42
+			bne suite
+			lda #$00
+			sta $020f
+			; Fermeture du fichier actuel
+			lda #$01
+			jsr FileClose
+		suite:
+			jsr SetFilename2
+			jmp	FileCreate
+		.)
+#if 0
+		OpenForWrite:
+		.(
+			lda $020f
+			beq suite
+			lda #$00
+			sta $020f
+			; Fermeture du fichier actuel
+			lda #$01
+			jsr FileClose
+		suite:
+			lda #$40
+			sta $020f
+			jsr SetFilename2
+			jmp	FileCreate
+		.)
+#endif
+		;---------------------------------------------------------------------------
+		; CheckJoystick (78 octets)
 		;---------------------------------------------------------------------------
 		; Scrute le Joystick
 		;
