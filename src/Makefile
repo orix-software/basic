@@ -23,6 +23,9 @@ endif
 
 ifeq ($(GIT_BRANCH),master)
 	GIT_BRANCH := $(shell cat VERSION 2>/dev/null)
+	BUILD_DATE = ""
+else
+	BUILD_DATE := $(shell date +" %d/%m %H:%M")
 endif
 
 #
@@ -37,9 +40,19 @@ ifeq ($(PROJECT_VERSION_MAJ),$(PROJECT_VERSION_MIN))
 endif
 
 #
+# Copyright par défaut
+#
+ifneq ($(HOBBIT),)
+	COPYRIGHT_MSG_AUTO = "HOBBIT BASIC 1.1"
+	ASFLAGS += -DHOBBIT=Hobbit
+	PROJECT = basicsd-hobbit
+else
+	COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+endif
+
+#
 # Sélection du type de carte (usb_host / sdcard)
 #
-COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
 
 ifeq ($(USB_MODE),sdcard)
 	PROJECT = basicsd
@@ -94,7 +107,7 @@ endif
 ifneq ($(COPYRIGHT_MSG),)
 	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
 else
-	COPYRIGHT_MSG = $(COPYRIGHT_MSG_AUTO), " v$(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)"
+	COPYRIGHT_MSG = $(COPYRIGHT_MSG_AUTO), " v$(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)$(BUILD_DATE)"
 	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
 endif
 

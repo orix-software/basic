@@ -130,7 +130,8 @@ INTTMP          = $33			; $33-$34: Utilisé par GetTapeData
 HIMEM_PTR       = $a6
 
 TXTPTR          = $e9
-PTR             = $f3
+rwpoin          = $f3			; word
+;PTR             = $f3
 PTW             = $f4
 ;PTR_MAX         = $f4
 ;PTW             = $f5
@@ -292,6 +293,13 @@ RESET_VECTOR    = $fffc
 
 			jsr	WriteLeader2
 
+;
+; [---------
+; Pb avec STORE, la calcul de est incorrect car fait plus tard par STORE
+; Supprimer cette partie
+; Modifier PutTapeData pour y inclure le SetByteWrite (cf GetTapeData)
+; Modifier PutTapeByte pour y inclure un SetByteWrite (cf GetTapeByte)
+;
 			; Test STORE
 			bit	PROGTYPE			; STORE?
 			bvc	CalcPgmLength		; Non -> Calcule la longueur du programme
@@ -322,6 +330,8 @@ RESET_VECTOR    = $fffc
 			sta	CH376_COMMAND
 			lda	CH376_DATA
 			sta	PTW			; Nombre d'octets attendu
+;
+;  ---------]
 			rts
 
 		;---------------------------------------------------------------------------
@@ -699,7 +709,7 @@ RESET_VECTOR    = $fffc
 		; Fermeture du fichier après sauvegarde
 		;---------------------------------------------------------------------------
 		WriteClose:
-			lda #$00
+			lda #$01
 			sta $020f			; Indique pas de fichier ouvert
 			jsr FileClose
 			jmp LE93D
@@ -722,8 +732,8 @@ RESET_VECTOR    = $fffc
 		.(
 			; Il faut vérifier si on à déjà ouvert un fichier ou non
 			; pour le multitap
-			jmp SyncTape_loop			; Point d'entrée direct
-			jsr OpenForRead			; Point d'entrée depuis TapeSync
+			jmp SyncTape_loop			; Point d'entrée direct, on suppose du multitap
+			jsr OpenForRead			; Point d'entrée depuis TapeSync, multitap uniquement si on fait CLOAD ""
 			;jsr	SetFilename2
 			;jsr	FileOpen
 			beq *+5
@@ -910,7 +920,7 @@ RESET_VECTOR    = $fffc
 			; InitCH376: inutile car fait pour le chargement
 			; du jeu de caractères
 			; jsr InitCH376
-			lda #$00
+			lda #$01
 			sta $020f
 			lda #<(BUFEDT+6)
 			sta TXTPTR
@@ -941,6 +951,7 @@ RESET_VECTOR    = $fffc
 			jmp	(RESET_VECTOR)
 #endif
 
+#ifndef HOBBIT
 		;---------------------------------------------------------------------------
 		; load_charset (36 octets)
 		;---------------------------------------------------------------------------
@@ -989,14 +1000,69 @@ RESET_VECTOR    = $fffc
 		load_charset_error:
 			rts
 		.)
+#else
+		;---------------------------------------------------------------------------
+		; InitCH376 (36 Octets)
+		;---------------------------------------------------------------------------
+		; Initialisation du CH376
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;
+		; Modifie:
+		;	-
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	Mount
+		;	$D4DA: ?UNDEF'D FUNCTION ERROR
+		;---------------------------------------------------------------------------
+		; $fd68: '<' -> 'B'
+		InitCH376:
+		Exists:
+			ldx	#6
+			stx	CH376_COMMAND
+			lda	#$ff
+			sta	CH376_DATA
+			lda	CH376_DATA
+			bne	InitError
+		SetUSB:
+			lda	#$15
+			sta	CH376_COMMAND
+			ldx	#CH376_USB_MODE
+			stx	CH376_DATA
 
+			;Wait 10us
+			nop
+			nop
+			jsr	Mount
+
+			;IFF ^.Z THEN InitError;
+			bne	InitError
+			rts
+
+		InitError:
+			jmp	$d4da
+		;	ldx	#$d7
+		;	jmp	$c47e			; "?CAN'T CONTINUE ERROR"
+		;	jmp	$d35c			; "?OUT OF DATA ERROR"
+
+		;	jmp	$e651			; Si $02B1 != 0 -> jmp $E656
+		;	jmp	$e656			; "Errors found" (mais pas de retour au BASIC)
+
+#endif
 	RAMCHECK_end:
 
 ;#print *
 #if * > $fa86
 #print "*** ERROR NORAMCHECK too long"
 #endif
-		.dsb $fa86-*, $EA
+		; /!\ 3DFongus s'attend à avoir un RTS en $EB85 pour détecter un Atmos
+		.dsb $fa86-*, $60
 	LFA86:
 #endif
 
@@ -1011,13 +1077,14 @@ RESET_VECTOR    = $fffc
 
 ; Si Détournement de l'appel ReadKbdCol
 #ifdef JOYSTICK_READKBDCOL
+#ifndef HOBBIT
 	new_patch((CharSet+$18), CharSet_end)
+#endif
 
 ;---------------------------------------------------------------------------
 ;		Patch pour le chargment du jeu de caractère par défaut
 ;			Placé dans le jeu de caractères
 ;---------------------------------------------------------------------------
-rwpoin = $00f3		; PTR
 ;H91 = rwpoin
 ERR_OPEN_DIR=$41
 
@@ -1057,72 +1124,38 @@ ERR_OPEN_DIR=$41
 ;
 ;$FF78
 ;								Total: 264
-
+;
+; Joystick:
+;	Down:	$f5
+;	Right:	$f6
+;	Left:	$f7
+;	Fire:	$f8
+;	UP:	$f9
+;
+; Touches:
+;	[SPACE]: $84
+;	[ENTER]: $AF
+;	[DOWN]:  $B4
+;	[RIGHT]: $BC
+;	[LEFT]: $AC
+;	[UP]  : $9C
+;
 
 
 		; Spécial pour The Hobbit qui vérifie la valeur en $FC78
 		; pour savoir si il s'agit d'un Oric-1 ou d'un Atmos
 		;.byte $00
+		; Psychiatric fait le même test
 
 		; $fc90-$fcad: 30 octets
 		; # $ % &
+#ifndef HOBBIT
 		default_chs_len:
 			.byte default_chs_end-default_chs-1
 		default_chs:
 			.byte DEFAULT_CHARSET,0
 		default_chs_end:
 
-#if 0
-; Transféré dans RamTest
-		;---------------------------------------------------------------------------
-		; load_charset (36 octets)
-		;---------------------------------------------------------------------------
-		; Charge un le jeu de caractère par défaut en RAM
-		;
-		; Entree:
-		;	-
-		;
-		; Sortie:
-		;	AY: Code erreur CH376 ($41 si Ok)
-		;
-		; Modifie:
-		;	rwpoin: Pointeur vers l'adresse de chargement
-		;
-		; Utilise:
-		;	-
-		; Sous-routines:
-		;	open_fqn
-		;	GetTapeData
-		;---------------------------------------------------------------------------
-		; $fcae
-		load_charset:
-		.(
-			; Ouverture du fichier
-			ldx default_chs_len
-			lda #<default_chs
-			ldy #>default_chs
-			jsr open_fqn
-			bne load_charset_error
-
-			; Adresse de chargement
-			lda #<$b500
-			ldy #>$b500
-			sta PROGSTART
-			sty PROGSTART+1
-
-			; Adresse de fin
-			lda #<($b500+$300)
-			ldy #<($b500+$300)
-			sta PROGEND
-			sty PROGEND+1
-
-			; Chargement du jeux de caractères
-			jsr GetTapeData
-
-		load_charset_error:
-			rts
-		.)
-#endif
 
 
 		;---------------------------------------------------------------------------
@@ -1299,7 +1332,12 @@ ERR_OPEN_DIR=$41
 			rts
 		.)
 
+#endif
 
+; [---
+#ifdef HOBBIT
+	new_patchl($fe50,48)
+#endif
 		;---------------------------------------------------------------------------
 		; SetByteReadWrite (33 octets)
 		;---------------------------------------------------------------------------
@@ -1356,115 +1394,16 @@ ERR_OPEN_DIR=$41
 			jmp SetByteWrite
 		.)
 
-#if 0
-; Transféré dans CheckFoundName
-		;---------------------------------------------------------------------------
-		; ReadUSBData(26 octets)
-		;---------------------------------------------------------------------------
-		; Charge un bloc en mémoire
-		;
-		; Entree:
-		;	AY: Adresse de chargement
-		;
-		; Sortie:
-		;	A: Modifié
-		;	X: 0
-		;	Y: Nombre d'octets lus
-		;
-		; Modifie:
-		;	INTTMP: Pointeur vers l'adresse de chargement
-		;
-		; Utilise:
-		;	-
-		; Sous-routines:
-		;	-
-		;---------------------------------------------------------------------------
-		ReadUSBData:
-		.(
-			; On peut supprimer les sta/sty si on supprime les lda/ldy de load_data
-			; et que INTTMP est à jour avant l'appel
- 		        sta INTTMP
-		        sty INTTMP+1
 
- 		ReadUSBData2:
- 		        ldy #0
-
-		        lda #$27
-		        sta CH376_COMMAND
-		        ldx CH376_DATA
-
-		        beq ZZZ002
-
-		ZZZ003:
-		        lda CH376_DATA
-		        sta (INTTMP),Y
-		        iny
-		        dex
-		        bne ZZZ003
-
-		ZZZ002:
-		        rts
-		.)
-#endif
-
-		;---------------------------------------------------------------------------
-		; ReadUSBData3 (26 octets)
-		;---------------------------------------------------------------------------
-		; Lit un caractère depuis la K7
-		;
-		; Entree:
-		;	-
-		;
-		; Sortie:
-		;	A: Caractère lu
-		;	$2f: Caractère lu
-		;
-		; Modifie:
-		;	$2f: Caractère lu
-		;
-		; Utilise:
-		;	-
-		; Sous-routines:
-		;	-
-		;---------------------------------------------------------------------------
-		; $fd4e: ':' -> '='
-                ReadUSBData3:
-                .(
-			; On lit 1 caractère
-			lda	#$01
-			ldy	#$00
-			jsr	SetByteRead
-			bne	fin_erreur
-
-;			jsr	ReadUSBData3			; Résultat dans $2f
-;			jsr	ByteRdGo
-;			bne	fin
-
-                        lda     #$27
-                        sta     CH376_COMMAND
-			lda	CH376_DATA			; Nombre de caractère à lire
-                        lda     CH376_DATA			; Caractère lu
-                        sta     $2f
-			clc					; Indique pas d'erreur de lecture
-			.byte $24
-		fin_erreur:
-			sec
-                        rts
-		.)
+		; Message d'erreur (15 octets)
+		; $fdbf: 'I' -> 'J'
+		FileNotFound_msg
+			.byte "FILE NOT FOUND",00
+; ---]
 
 
-;		_ClrTapeStatus:
-;			jsr	ClrTapeStatus
-;; ---HCL---
-;			rts
-;; ---HCL---
-;			lda	#$01			; Fermeture avec mise à jour de la taille
-;			jmp	FileClose
 
-
-;		_SetupTape:
-;			jsr	StopTimer
-
+#ifndef HOBBIT
 		;---------------------------------------------------------------------------
 		; InitCH376 (36 Octets)
 		;---------------------------------------------------------------------------
@@ -1517,7 +1456,62 @@ ERR_OPEN_DIR=$41
 
 		;	jmp	$e651			; Si $02B1 != 0 -> jmp $E656
 		;	jmp	$e656			; "Errors found" (mais pas de retour au BASIC)
+#endif
 
+
+; [---
+#ifdef HOBBIT
+	new_patchl($fcb8, 29)
+#endif
+		;---------------------------------------------------------------------------
+		; ReadUSBData3 (26+3 octets)
+		;---------------------------------------------------------------------------
+		; Lit un caractère depuis la K7
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Caractère lu
+		;	$2f: Caractère lu
+		;
+		; Modifie:
+		;	$2f: Caractère lu
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	-
+		;---------------------------------------------------------------------------
+		; $fd4e: ':' -> '='
+                ReadUSBData3:
+                .(
+			; On lit 1 caractère
+			lda	#$01
+			ldy	#$00
+			jsr	SetByteRead
+			bne	fin_erreur
+
+;			jsr	ReadUSBData3			; Résultat dans $2f
+;			jsr	ByteRdGo
+;			bne	fin
+
+                        lda     #$27
+                        sta     CH376_COMMAND
+			lda	CH376_DATA			; Nombre de caractère à lire
+                        lda     CH376_DATA			; Caractère lu
+                        sta     $2f
+			jsr     ByteRdGo			; Nécessaire en réel, sinon le CH376 boucle sur son buffer
+			clc					; Indique pas d'erreur de lecture
+			.byte $24
+		fin_erreur:
+			sec
+                        rts
+		.)
+
+#ifdef HOBBIT
+	new_patchl($fc90,27)
+#endif
 		;---------------------------------------------------------------------------
 		; 27 Octets
 		;---------------------------------------------------------------------------
@@ -1544,6 +1538,9 @@ ERR_OPEN_DIR=$41
 			sta	CH376_COMMAND
 			bne	CH376_CmdWait2
 
+#ifdef HOBBIT
+	new_patchl($fd50, 24)
+#endif
 		;---------------------------------------------------------------------------
 		; (24 octets)
 		;---------------------------------------------------------------------------
@@ -1567,17 +1564,12 @@ ERR_OPEN_DIR=$41
 			; Retour à PrintErrorX
 			jmp LC496
 
-		; Message d'erreur (15 octets)
-		; $fdbf: 'I' -> 'J'
-		FileNotFound_msg
-			.byte "FILE NOT FOUND",00
-;			nop
-;			nop
-;			nop
-;			nop
-;			nop
-;			nop
+; --]
 
+; [---
+#ifdef HOBBIT
+	new_patchl($ff50,40)
+#endif
 		;---------------------------------------------------------------------------
 		; OpenForRead (17 octets)
 		;---------------------------------------------------------------------------
@@ -1595,63 +1587,27 @@ ERR_OPEN_DIR=$41
 		; Utilise:
 		;	-
 		; Sous-routines:
-		;	SetFilename2
+		;	CloseOpenedFile
 		;	FileOpen
 		;---------------------------------------------------------------------------
 		; $fdce: 'J' -> 'L'
-#if 1
+
 		OpenForRead:
 		.(
 			lda PROGNAME
 			beq fin
-			jsr SetFilename2
-			lda #$42
+			jsr CloseOpenedFile
+			;jsr SetFilename2
+			lda #$00
 			sta $020f
 			jmp	FileOpen
 
 		fin:
 			rts
 		.)
-
-#endif
-#if 0
-		OpenForRead:
-		.(
-			lda $020f
-			cmp #$42
-			bne *+3
-			rts
-			jsr SetFilename2
-			lda #$42
-			sta $020f
-			jmp	FileOpen
-
-		fin:
-			rts
-		.)
-#endif
-#if 0
-		OpenForRead:
-		.(
-			bit $020f
-			bmi fin
-			bvs suite
-			lda #$20
-			sta $020f
-		suite
-			asl $020f
-			jsr SetFilename2
-			jsr FileOpen
-			rts
-		fin:
-			asl $020f
-			lda #$ff
-			rts
-		.)
-#endif
 
 		;---------------------------------------------------------------------------
-		; OpenForWrite ( 23 octets)
+		; OpenForWrite ( 6 octets)
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier en écriture
 		;
@@ -1667,42 +1623,62 @@ ERR_OPEN_DIR=$41
 		; Utilise:
 		;	-
 		; Sous-routines:
-		;	FileClose
-		;	SetFilename2
+		;	CloseOpenedFile
 		;	FileCreate
 		;---------------------------------------------------------------------------
 		; $fddf: 'M' -> 'O'
 		OpenForWrite:
 		.(
-			lda $020f
-			cmp #$42
-			bne suite
-			lda #$00
-			sta $020f
-			; Fermeture du fichier actuel
-			lda #$01
-			jsr FileClose
-		suite:
-			jsr SetFilename2
+;			lda $020f
+;			;cmp #$42
+;			bne suite
+;			;lda #$00
+;			;sta $020f
+;			; Fermeture du fichier actuel
+;			lda #$01
+;			sta $020f
+;			jsr FileClose
+;		suite:
+			jsr CloseOpenedFile
+			;jsr SetFilename2
 			jmp	FileCreate
 		.)
-#if 0
-		OpenForWrite:
+
+		;---------------------------------------------------------------------------
+		; CloseOpenedFile ( 17 octets)
+		;---------------------------------------------------------------------------
+		; Ouvre un fichier en écriture
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	-
+		;
+		; Modifie:
+		;	$020f: Flag fichier ouvert
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	FileClose
+		;---------------------------------------------------------------------------
+		CloseOpenedFile:
 		.(
 			lda $020f
-			beq suite
-			lda #$00
-			sta $020f
+			bne suite
 			; Fermeture du fichier actuel
 			lda #$01
+			sta $020f
 			jsr FileClose
 		suite:
-			lda #$40
-			sta $020f
 			jsr SetFilename2
-			jmp	FileCreate
+			rts
 		.)
-#endif
+; ---]
+
+
+#ifndef HOBBIT
 		;---------------------------------------------------------------------------
 		; CheckJoystick (78 octets)
 		;---------------------------------------------------------------------------
@@ -1801,6 +1777,7 @@ ERR_OPEN_DIR=$41
 			jmp LF4C6		; Retour à ReadKbd
 
 		.)
+#endif
 
 CharSet_end:
 
@@ -1852,6 +1829,14 @@ CharSet_end:
 	;---------------------------------------------------------------------------
 	; Pointe vers le message de Copyright
 	; Pour Telestrat (signature de la banque)
+	;
+	; /!\ ATTENTION: Frelon et Hellion testent $fff9 pour savoir si il s'agit
+	;                d'un Atmos ($01) ou non
+	;                Pour compatibilité avec ces jeux, adresses possible
+	;                de Copyright: $FD01 ('1'), $FE01 ('Q')ou $FF01 ('q') dans le
+	;                jeu de caractères.
+	;                Dans ce cas, la zone $ED96-$EDC3 est disponible (ancien message)
+	;                il faut en outre modifier les instructions en $ED38 et $ED3A
 	;---------------------------------------------------------------------------
 		new_patchl($fff8,2)
 				.word Copyright
@@ -1944,18 +1929,22 @@ CharSet_end:
 
 #ifdef JOYSTICK_READKBDCOL
 #echo "Joystick driver: ReadKbdCol"
+
+#ifndef HOBBIT
 	; Patch de la routine CheckKbd
 	new_patchl(ReadKbd+5,3)
 		jsr CheckJoystick
-
+#endif
 	; Patche de la routine d'init pour ne pas
 	; copier le jeu de caractères depuis la rom vers la ram.
 	; On suppose que l'Oric a déjà démarré et que le jeu est en place
 	new_patchl(LF8B8+26,3)
-	;nop
-	;nop
-	;nop
+#ifndef HOBBIT
 	jsr load_charset
+#else
+	jsr InitCH376
+#endif
+
 #endif
 
 #endif
