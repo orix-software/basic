@@ -80,43 +80,55 @@
 	;---------------------------------------------------------------------------
 	;			Commande QUIT
 	;---------------------------------------------------------------------------
-#ifdef BASIC_LET_IS_QUIT
-#undef BASIC_TRON_IS_QUIT
-#undef BASIC_TROFF_IS_QUIT
-#define BASIC_QUIT
-#endif
+;#ifdef BASIC_LET_IS_QUIT
+;#undef BASIC_TRON_IS_QUIT
+;#undef BASIC_TROFF_IS_QUIT
+;#define BASIC_QUIT
+;#endif
 
-#ifdef BASIC_TRON_IS_QUIT
-#undef BASIC_LET_IS_QUIT
-#undef BASIC_TROFF_IS_QUIT
-#define BASIC_QUIT
-#endif
+;#ifdef BASIC_TRON_IS_QUIT
+;#undef BASIC_LET_IS_QUIT
+;#undef BASIC_TROFF_IS_QUIT
+;#define BASIC_QUIT
+;#endif
 
-#ifdef BASIC_TROFF_IS_QUIT
-#undef BASIC_LET_IS_QUIT
+;#ifdef BASIC_TROFF_IS_QUIT
+;#undef BASIC_LET_IS_QUIT
+;#define BASIC_TRON_IS_QUIT
+;#define BASIC_QUIT
+;#endif
+
 #define BASIC_TRON_IS_QUIT
 #define BASIC_QUIT
-#endif
 
 	;---------------------------------------------------------------------------
 	;			Gestion Joystick
 	;---------------------------------------------------------------------------
 #ifdef JOYSTICK_DRIVER
-#define JOYSTICK_READKBDCOL
+;#define JOYSTICK_READKBDCOL
 #define JOY_TBL $f5
 #define NO_CHARSET
-#undef CHECKRAM_16K
+#define LOAD_CHARSET
+#undef HOBBIT
+;#undef CHECKRAM_16K
 #endif
 
+#ifdef HOBBIT
+#undef JOYSTICK_DRIVER
+#define NO_CHARSET
+#undef LOAD_CHARSET
+#endif
 
 	;---------------------------------------------------------------------------
 	;			Chargement du jeu de caractères
 	;---------------------------------------------------------------------------
 #ifdef NO_CHARSET
+#ifdef LOAD_CHARSET
 #ifndef DEFAULT_CHARSET
 #define DEFAULT_CHARSET "/USR/SHARE/FONTS/DEFAULT.CHS"
 #endif
 #echo "Default charset: DEFAULT_CHARSET"
+#endif
 #endif
 
 ;---------------------------------------------------------------------------
@@ -130,9 +142,9 @@ INTTMP          = $33			; $33-$34: Utilisé par GetTapeData
 HIMEM_PTR       = $a6
 
 TXTPTR          = $e9
-rwpoin          = $f3			; word
+rwpoin          = $0C			; word
 ;PTR             = $f3
-PTW             = $f4
+;PTW             = $f4
 ;PTR_MAX         = $f4
 ;PTW             = $f5
 ;PTW_MAX         = $f6
@@ -246,93 +258,148 @@ RESET_VECTOR    = $fffc
 			jmp OpenTapeWrite
 
 	;---------------------------------------------------------------------------
-	; 22 Octets
+	; 14 Octets
 	;---------------------------------------------------------------------------
 	new_patch(PutTapeByte, LE6C9)
 
 		-PutTapeByte:
 		.(
 			; Doit conserver X et Y
-			sta	CH376_DATA
-			dec	PTW
-			bne	ZZ0001
-			tya				; Sauvegarde de X et Y
-			pha
-			txa
-			pha
-			jsr	ByteWrGo
-			jsr	WriteRqData
-			pla				; Restaure X et Y
-			tax
-			pla
-			tay
-		ZZ0001:
-			rts
+			; A voir si la modification de $2f ne perturbe pas
+			; les programmes de jeux
+		        sta     $2F                             ; E6F9 A5 2F
+		        tya                                     ; E6C9 98
+		        pha                                     ; E6CA 48
+		        txa                                     ; E6CB 8A
+		        pha                                     ; E6CC 48
+
+			; On écrit 1 caractère
+			jsr 	WriteUSBData3			; Ecrit un caractère, résultat dans $2f
+;			bcs	fin_erreur
+;		fin_erreur:
+;			message d'erreur?
+		fin:
+		        pla                                     ; E6F5 68
+		        tax                                     ; E6F6 AA
+		        pla                                     ; E6F7 68
+		        tay                                     ; E6F8 A8
+		        rts                                     ; E6FB 60
 		.)
 
 		;---------------------------------------------------------------------------
-		; 58 Octets
+		; 9 Octets
 		;---------------------------------------------------------------------------
 		; Sauvegarde de l'entête
 		OpenTapeWrite:
 			;lda #<PROGNAME			; Forcé dans SetFilename2
 			;ldy #>PROGNAME
 			jsr	OpenForWrite
-			;jsr	FileCreate
+			jsr	WriteLeader
+			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
 
-			lda	$2f			; longueur du nom sans le 0 final, d'où le +1
-			clc
-			adc	#14+1			; +14+1 -> longueur de l'entête avec 4x16
+
+		;---------------------------------------------------------------------------
+		; 27 Octets
+		;---------------------------------------------------------------------------
+		; Ecrit un octet sur la bande
+                WriteUSBData3:
+                .(
+			; On écrit 1 caractère
+			lda	#$01
 			ldy	#$00
-
-		; On remplace les 3 jsr par jsr WriteLeader2
-		;	jsr	SetByteAndWrite
-		;	jsr	WriteLeader		; Ecriture de l'amorce
-		;	jsr	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
-			; jsr	WriteRqData		; Flush du fichier (Inutile, effectué automatiquement par PutTapeByte)
-
-			jsr	WriteLeader2
-
-;
-; [---------
-; Pb avec STORE, la calcul de est incorrect car fait plus tard par STORE
-; Supprimer cette partie
-; Modifier PutTapeData pour y inclure le SetByteWrite (cf GetTapeData)
-; Modifier PutTapeByte pour y inclure un SetByteWrite (cf GetTapeByte)
-;
-			; Test STORE
-			bit	PROGTYPE			; STORE?
-			bvc	CalcPgmLength		; Non -> Calcule la longueur du programme
-			jmp	CalcArrayLength		; Oui -> Calcule la longueur du tableau
-
-			; Optimisé (15+5)
-		CalcPgmLength:
-			sec				; Calcule la taille du programme
-			lda	PROGEND
-			sbc	PROGSTART
-			tax
-
-			lda	PROGEND+1
-			sbc	PROGSTART+1
-			tay
-
-		WriteLength:
-			inx				; +1
-			bne	*+3
-			iny
-
-			txa
-		SetByteAndWrite:
 			jsr	SetByteWrite
+			;bne	fin_erreur			; TODO: /!\ Test par rapport à $1D mais SetByteWrite renvoie $14 (au moins avec Oricutron, à vérifier en réel)
 
-		WriteRqData:
-			lda	#$2d			; WriteReqData
-			sta	CH376_COMMAND
-			lda	CH376_DATA
-			sta	PTW			; Nombre d'octets attendu
-;
-;  ---------]
+                        lda     #$2d				; WriteRqData
+                        sta     CH376_COMMAND
+			lda	CH376_DATA			; Nombre de caractère à écrire
+                        lda     $2f
+                        sta     CH376_DATA			; Caractère écrit
+			jsr     ByteWrGo			; Nécessaire en réel, sinon le CH376 boucle sur son buffer
+			clc					; Indique pas d'erreur de lecture
+			.byte $24
+		fin_erreur:
+			sec
+                        rts
+		.)
+
+#if 0
+; 38 octets
+		-PutTapeData:
+		.(
+			jsr	SetByteReadWrite+2
+			bne	_PutTapeData_error
+
+			lda PROGSTART
+			ldy PROGSTART+1
+			sta INTTMP
+			sty INTTMP+1
+
+			; Boucle de chargement de la fonte (27 octets)
+		loop:
+			; On peut supprimer les lda/ldy si on supprime les sta/sty de ReadUSBData
+			;lda INTTMP
+			;ldy INTTMP+1
+			jsr WriteUSBData
+
+			;clc
+			;bcs WriteNextChunk
+			cpy #$00		; Nombre d'octets lus == 0?
+			beq fin
+
+			; Ajuste le pointeur
+			clc
+			tya
+			adc INTTMP
+			sta INTTMP
+			bcc *+4
+			inc INTTMP+1
+
+		ReadNextChunk:
+			jsr ByteWrGo
+			beq loop
+
+		fin:
+		_GetTapeData_error:
 			rts
+		.)
+
+; 22 octets
+		WriteUSBData:
+		.(
+			; On peut supprimer les sta/sty si on supprime les lda/ldy de load_data
+			; et que INTTMP est à jour avant l'appel
+		        ;sta INTTMP
+		        ;sty INTTMP+1
+
+		WriteUSBData2:
+		        ldy #0
+
+		        lda #$2d			; WriteReqData
+		        sta CH376_COMMAND
+		        ldx CH376_DATA
+
+		        beq ZZZ002
+
+		ZZZ003:
+		        lda (INTTMP),Y
+		        sta CH376_DATA
+		        iny
+		        dex
+		        bne ZZZ003
+
+		ZZZ002:
+		        rts
+		.)
+#endif
+
+
+		; Inutile pour le moment
+;		WriteRqData:
+;			lda	#$2d			; WriteReqData
+;			sta	CH376_COMMAND
+;			lda	CH376_DATA
+;			rts
 
 		;---------------------------------------------------------------------------
 		; 26 Octets - Calcul du nombre d'octets à écrire dans le fichier
@@ -411,6 +478,7 @@ RESET_VECTOR    = $fffc
 		;										; RETURN;
 		;	rts
 
+	; Actuellement: $E6A9
 	LE6C9:
 
 
@@ -462,14 +530,14 @@ RESET_VECTOR    = $fffc
 	;---------------------------------------------------------------------------
 	; 10 Octets à l'emplacement de "MICROSOFT!"
 	;---------------------------------------------------------------------------
-	new_patch($e435,LE43F)
+;	new_patch($e435,LE43F)
 
-		CalcArrayLength:
-			ldx	PROGSTART
-			ldy	PROGSTART+1
-			jmp	WriteLength
-			nop
-	LE43F:
+;		CalcArrayLength:
+;			ldx	PROGSTART
+;			ldy	PROGSTART+1
+;			jmp	WriteLength
+;			nop
+;	LE43F:
 
 
 
@@ -543,6 +611,8 @@ RESET_VECTOR    = $fffc
 		_GetTapeData_error:
 			rts
 		.)
+
+	; Actuellement: $E506
 	LE50A:
 
 	;---------------------------------------------------------------------------
@@ -559,7 +629,7 @@ RESET_VECTOR    = $fffc
 		; Ok: 24/51 octets
 		-GetTapeByte:
 		; ----------------------------------------------------------------------------
-		; GetTapeByte: Modifié (28 octets)
+		; GetTapeByte: Modifié (14 octets)
 		; ----------------------------------------------------------------------------
 		.(
 		        tya                                     ; E6C9 98
@@ -588,7 +658,7 @@ RESET_VECTOR    = $fffc
 		; E6E1
 
 		;---------------------------------------------------------------------------
-		; 35 Octets + 5 en ZZD001
+		; 35 Octets + 5 en ZZD001 (ou 45+5 si FORE_UPPERCASE)
 		;---------------------------------------------------------------------------
 			; SetFilename2: 38 octets
 		SetFilename2:
@@ -697,11 +767,11 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; 10 Octets
 		;---------------------------------------------------------------------------
-		WriteLeader2:
-			jsr	SetByteAndWrite
-			jsr	WriteLeader		; Ecriture de l'amorce
-			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
-			; jsr	WriteRqData		; Flush du fichier (Inutile, effectué automatiquement par PutTapeByte)
+;		WriteLeader2:
+;			jsr	SetByteAndWrite
+;			jsr	WriteLeader		; Ecriture de l'amorce
+;			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
+;			; jsr	WriteRqData		; Flush du fichier (Inutile, effectué automatiquement par PutTapeByte)
 
 		;---------------------------------------------------------------------------
 		; 6 Octets
@@ -713,6 +783,8 @@ RESET_VECTOR    = $fffc
 			sta $020f			; Indique pas de fichier ouvert
 			jsr FileClose
 			jmp LE93D
+
+	; Actuellement: $E72C
 	LE735:
 
 	;---------------------------------------------------------------------------
@@ -762,6 +834,7 @@ RESET_VECTOR    = $fffc
 		.)
 
 
+	; Actuellement: $E756
 	LE75A:
 	; WriteLeader
 
@@ -843,6 +916,8 @@ RESET_VECTOR    = $fffc
 		ZZZ002:
 		        rts
 		.)
+
+	; Actuellement: $E7AB
 	LE7AF:
 
 ;---------------------------------------------------------------------------
@@ -880,7 +955,7 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 ;			Patch de la routine RamTest
 ;---------------------------------------------------------------------------
-#ifdef NORAMCHECK
+;#ifdef NORAMCHECK
 	;
 	; Supprime le test de la RAM
 	; pour accélérer le démarrage
@@ -895,26 +970,11 @@ RESET_VECTOR    = $fffc
 			sty	$0500
 			sty	HIMEM_PTR
 			sty	HIMEM_MAX
-;#ifdef CHECKRAM_16K
-;			; Test 48Ko
-;			dey
-;			sty	$4500
-;			lda	$0500
-;			bne	LFA31
-;#endif
 			lda	#$c0-$28
-;#ifdef CHECKRAM_16K
-;			bne	LFA36
-;		LFA31:
-;			; 16Ko seulement
-;			inc	RAMSIZEFLAG
-;			lda	#$40-$28
-;#endif
-;		LFA36:
 			sta	HIMEM_PTR+1
 			sta	HIMEM_MAX+1
 			rts
-;	LFA3C:
+
 		; 27 octets
 		ORIX_AUTOLOAD:
 			; InitCH376: inutile car fait pour le chargement
@@ -951,7 +1011,7 @@ RESET_VECTOR    = $fffc
 			jmp	(RESET_VECTOR)
 #endif
 
-#ifndef HOBBIT
+#ifdef LOAD_CHARSET
 		;---------------------------------------------------------------------------
 		; load_charset (36 octets)
 		;---------------------------------------------------------------------------
@@ -1002,7 +1062,7 @@ RESET_VECTOR    = $fffc
 		.)
 #else
 		;---------------------------------------------------------------------------
-		; InitCH376 (36 Octets)
+		; InitCH376 (31 Octets)
 		;---------------------------------------------------------------------------
 		; Initialisation du CH376
 		;
@@ -1019,7 +1079,6 @@ RESET_VECTOR    = $fffc
 		;	-
 		; Sous-routines:
 		;	Mount
-		;	$D4DA: ?UNDEF'D FUNCTION ERROR
 		;---------------------------------------------------------------------------
 		; $fd68: '<' -> 'B'
 		InitCH376:
@@ -1042,11 +1101,12 @@ RESET_VECTOR    = $fffc
 			jsr	Mount
 
 			;IFF ^.Z THEN InitError;
-			bne	InitError
-			rts
+		;	bne	InitError
+		;	rts
 
 		InitError:
-			jmp	$d4da
+			rts
+		;	jmp	$d4da
 		;	ldx	#$d7
 		;	jmp	$c47e			; "?CAN'T CONTINUE ERROR"
 		;	jmp	$d35c			; "?OUT OF DATA ERROR"
@@ -1061,10 +1121,10 @@ RESET_VECTOR    = $fffc
 #if * > $fa86
 #print "*** ERROR NORAMCHECK too long"
 #endif
-		; /!\ 3DFongus s'attend à avoir un RTS en $EB85 pour détecter un Atmos
+		; /!\ 3DFongus s'attend à avoir un RTS en $FA85 pour détecter un Atmos
 		.dsb $fa86-*, $60
 	LFA86:
-#endif
+;#endif
 
 
 
@@ -1073,10 +1133,10 @@ RESET_VECTOR    = $fffc
 ;			Placé dans le jeu de caractères
 ;---------------------------------------------------------------------------
 #ifdef NO_CHARSET
-#ifdef JOYSTICK_DRIVER
+;#ifdef JOYSTICK_DRIVER
 
 ; Si Détournement de l'appel ReadKbdCol
-#ifdef JOYSTICK_READKBDCOL
+;#ifdef JOYSTICK_READKBDCOL
 #ifndef HOBBIT
 	new_patch((CharSet+$18), CharSet_end)
 #endif
@@ -1149,7 +1209,7 @@ ERR_OPEN_DIR=$41
 
 		; $fc90-$fcad: 30 octets
 		; # $ % &
-#ifndef HOBBIT
+#ifdef LOAD_CHARSET
 		default_chs_len:
 			.byte default_chs_end-default_chs-1
 		default_chs:
@@ -1185,17 +1245,6 @@ ERR_OPEN_DIR=$41
 		; $fcae: '&' -> '6'
 		open_fqn:
 		.(
-			; Sauvegarde la longueur de la chaine, le temps
-			; de mettre à l'abri $F5 et $F6
-;			tay
-
-			; Sauvegarde $F5 et $F6 car utilisés par le Joystick
-;			lda rwpoin+2
-;			pha
-;			lda rwpoin+3
-;			pha
-
-
 			sta rwpoin
 			sty rwpoin+1
 
@@ -1212,12 +1261,6 @@ ERR_OPEN_DIR=$41
 										; IF .Z THEN
 			bne ZZ1002
 										; BEGIN;
-			; La suite est faite dans InitCH376 de la rom
-			;jsr SetSD
-			;nop
-			;nop
-			;jsr Mount
-			;bne ZZ1002
 
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
 										; IF &rwpoin = '/' THEN
@@ -1321,12 +1364,6 @@ ERR_OPEN_DIR=$41
 										; .Y = .A;
 			tay
 										; CLEAR .A;
-			; Restaure $F5 et $F6
-;			pla
-;			sta rwpoin+3
-;			pla
-;			sta rwpoin+2
-
 			lda #0
 										;RETURN;
 			rts
@@ -1403,9 +1440,9 @@ ERR_OPEN_DIR=$41
 
 
 
-#ifndef HOBBIT
+#ifdef LOAD_CHARSET
 		;---------------------------------------------------------------------------
-		; InitCH376 (36 Octets)
+		; InitCH376 (31 Octets)
 		;---------------------------------------------------------------------------
 		; Initialisation du CH376
 		;
@@ -1422,7 +1459,6 @@ ERR_OPEN_DIR=$41
 		;	-
 		; Sous-routines:
 		;	Mount
-		;	$D4DA: ?UNDEF'D FUNCTION ERROR
 		;---------------------------------------------------------------------------
 		; $fd68: '<' -> 'B'
 		InitCH376:
@@ -1445,11 +1481,12 @@ ERR_OPEN_DIR=$41
 			jsr	Mount
 
 			;IFF ^.Z THEN InitError;
-			bne	InitError
-			rts
+		;	bne	InitError
+		;	rts
 
 		InitError:
-			jmp	$d4da
+			rts
+		;	jmp	$d4da
 		;	ldx	#$d7
 		;	jmp	$c47e			; "?CAN'T CONTINUE ERROR"
 		;	jmp	$d35c			; "?OUT OF DATA ERROR"
@@ -1464,7 +1501,7 @@ ERR_OPEN_DIR=$41
 	new_patchl($fcb8, 29)
 #endif
 		;---------------------------------------------------------------------------
-		; ReadUSBData3 (26+3 octets)
+		; ReadUSBData3 (29 octets)
 		;---------------------------------------------------------------------------
 		; Lit un caractère depuis la K7
 		;
@@ -1491,10 +1528,6 @@ ERR_OPEN_DIR=$41
 			ldy	#$00
 			jsr	SetByteRead
 			bne	fin_erreur
-
-;			jsr	ReadUSBData3			; Résultat dans $2f
-;			jsr	ByteRdGo
-;			bne	fin
 
                         lda     #$27
                         sta     CH376_COMMAND
@@ -1629,16 +1662,6 @@ ERR_OPEN_DIR=$41
 		; $fddf: 'M' -> 'O'
 		OpenForWrite:
 		.(
-;			lda $020f
-;			;cmp #$42
-;			bne suite
-;			;lda #$00
-;			;sta $020f
-;			; Fermeture du fichier actuel
-;			lda #$01
-;			sta $020f
-;			jsr FileClose
-;		suite:
 			jsr CloseOpenedFile
 			;jsr SetFilename2
 			jmp	FileCreate
@@ -1678,7 +1701,7 @@ ERR_OPEN_DIR=$41
 ; ---]
 
 
-#ifndef HOBBIT
+#ifdef JOYSTICK_DRIVER
 		;---------------------------------------------------------------------------
 		; CheckJoystick (78 octets)
 		;---------------------------------------------------------------------------
@@ -1753,7 +1776,7 @@ ERR_OPEN_DIR=$41
 			sta $0208		; Sauvegarde le code de la touche dans $0208
 
 			; On calcule le masque pour la ligne
-			; correspondant à la touchr
+			; correspondant à la touche
 			and #$07		; N° de ligne de la touche
 			tay			; Sert de compteur
 			iny
@@ -1787,9 +1810,9 @@ CharSet_end:
 ;			.dsb KeyCodeTab-*,$ff
 
 		; #ifdef JOYSTICK_DRIVER
-#endif
+;#endif
 	; #ifdef JOYSTICK_READKBDCOL
-#endif
+;#endif
 
 ; #ifdef NO_CHARSET
 #endif
@@ -1832,7 +1855,7 @@ CharSet_end:
 	;
 	; /!\ ATTENTION: Frelon et Hellion testent $fff9 pour savoir si il s'agit
 	;                d'un Atmos ($01) ou non
-	;                Pour compatibilité avec ces jeux, adresses possible
+	;                Pour compatibilité avec ces jeux, adresses possibles
 	;                de Copyright: $FD01 ('1'), $FE01 ('Q')ou $FF01 ('q') dans le
 	;                jeu de caractères.
 	;                Dans ce cas, la zone $ED96-$EDC3 est disponible (ancien message)
@@ -1853,19 +1876,19 @@ CharSet_end:
 ;---------------------------------------------------------------------------
 ;Commande de retour à Orix
 ;---------------------------------------------------------------------------
-#ifdef BASIC_LET_IS_QUIT
-	;---------------------------------------------------------------------------
-	; Remplace LET par OUT
-	;---------------------------------------------------------------------------
-	new_patchl($c149,3)
-			.byte "OU","T"+$80
-
-	;---------------------------------------------------------------------------
-	; Modifie adresses d'exécution LET -> QUIT
-	;---------------------------------------------------------------------------
-	new_patchl($c032,2)
-			.word QUIT-1
-#endif
+;#ifdef BASIC_LET_IS_QUIT
+;	;---------------------------------------------------------------------------
+;	; Remplace LET par OUT
+;	;---------------------------------------------------------------------------
+;	new_patchl($c149,3)
+;			.byte "OU","T"+$80
+;
+;	;---------------------------------------------------------------------------
+;	; Modifie adresses d'exécution LET -> QUIT
+;	;---------------------------------------------------------------------------
+;	new_patchl($c032,2)
+;			.word QUIT-1
+;#endif
 
 #ifdef BASIC_TRON_IS_QUIT
 	;---------------------------------------------------------------------------
@@ -1889,7 +1912,7 @@ CharSet_end:
 
 	;---------------------------------------------------------------------------
 	; 9 octets disponibles de $CD16 à $CD1E inclus
-	; Peut être transféré vers _FileNotFound
+	; Peut être transféré vers _FileNotFound ou MICROSOFT!
 	;---------------------------------------------------------------------------
 	new_patch(TRON, LCD1F)
 		NotFound:
@@ -1918,47 +1941,37 @@ CharSet_end:
 	;	jmp CheckJoystick
 
 	;---------------------------------------------------------------------------
-	; Patch pour de la routine CheckKbd
+	; Patch pour de la routine ReadKbdCol
 	;---------------------------------------------------------------------------
-#ifdef JOYSTICK_CHECKKBD
-#echo "Joystick driver: ChekKbd"
-	new_patchl(CheckKbd,3)
-;	new_patchl($EE62,3)
-		jsr CheckJoystick
-#else
-
-#ifdef JOYSTICK_READKBDCOL
 #echo "Joystick driver: ReadKbdCol"
 
-#ifndef HOBBIT
 	; Patch de la routine CheckKbd
 	new_patchl(ReadKbd+5,3)
 		jsr CheckJoystick
 #endif
+
+;---------------------------------------------------------------------------
+;		Ajout chargement dynamique du jeu de caractères
+;---------------------------------------------------------------------------
+#ifdef NO_CHARSET
 	; Patche de la routine d'init pour ne pas
 	; copier le jeu de caractères depuis la rom vers la ram.
 	; On suppose que l'Oric a déjà démarré et que le jeu est en place
+	; Initialise le CH376 au lieu d copier le jeu ROM->RAM
 	new_patchl(LF8B8+26,3)
-#ifndef HOBBIT
-	jsr load_charset
-#else
 	jsr InitCH376
 #endif
 
+;---------------------------------------------------------------------------
+;		Ajout chargement dynamique du jeu de caractères
+;---------------------------------------------------------------------------
+#ifdef LOAD_CHARSET
+	; Patche de la routine d'init pour ne pas
+	; copier le jeu de caractères depuis la rom vers la ram.
+	; On suppose que l'Oric a déjà démarré et que le jeu est en place
+	; Charge un jeu decaractères depuis la carte SD/USB
+	new_patchl(LF8B8+26,3)
+	jsr load_charset
 #endif
 
-#endif
-
-	;---------------------------------------------------------------------------
-	; Patch pour l'instruction GET
-	;---------------------------------------------------------------------------
-	;new_patchl($cdb5,3)
-	;	jsr CheckJoystick
-
-	;---------------------------------------------------------------------------
-	; Patch pour l'instruction KEY$
-	;---------------------------------------------------------------------------
-	;new_patchl($dada,3)
-	;	jsr CheckJoystick
-#endif
 
