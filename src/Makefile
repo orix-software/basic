@@ -6,7 +6,9 @@ PROJECT = basicsd
 BUILDPATH = ../build/cart
 
 USB_MODE ?= sdcard
-BACK_TO_ORIX ?= TRON
+BACK_TO_ORIX ?= yes
+JOYSTICK ?= yes
+EXPERIMENTAL ?= no
 
 # %<-------------------------------------------------------------------------->%
 #               Ne rien modifier au dela de cette ligne
@@ -22,7 +24,7 @@ else
 endif
 
 ifeq ($(GIT_BRANCH),master)
-	GIT_BRANCH := $(shell cat VERSION 2>/dev/null)
+	GIT_BRANCH := $(shell cat ../VERSION 2>/dev/null)
 	BUILD_DATE = ""
 else
 	BUILD_DATE := $(shell date +" %d/%m %H:%M")
@@ -42,10 +44,12 @@ endif
 #
 # Copyright par défaut
 #
-ifneq ($(HOBBIT),)
-	COPYRIGHT_MSG_AUTO = "HOBBIT BASIC 1.1"
-	ASFLAGS += -DHOBBIT=Hobbit
+ifeq ($(HOBBIT),yes)
+	COPYRIGHT_MSG_AUTO = "Hobbit BASIC 1.1"
+	ASFLAGS += -DHOBBIT=yes
 	PROJECT = basicsd-hobbit
+	JOYSTICK = no
+	EXPERIMENTAL = no
 else
 	COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
 endif
@@ -58,12 +62,12 @@ ifeq ($(USB_MODE),sdcard)
 	PROJECT = basicsd
 	# COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1 SD v$(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)"
 	COPYRIGHT_MSG_AUTO += ," SD"
-	ASFLAGS += -DNORAMCHECK -DCH376_USB_MODE=3
+	ASFLAGS += -DCH376_USB_MODE=3
 else
 	PROJECT = basicusb
 	# COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1 USB v$(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)"
 	COPYRIGHT_MSG_AUTO += ," USB"
-	ASFLAGS += -DNORAMCHECK -DCH376_USB_MODE=6
+	ASFLAGS += -DCH376_USB_MODE=6
 endif
 
 #
@@ -79,20 +83,14 @@ endif
 
 
 
-ifneq ($(JOYSTICK),)
+ifeq ($(JOYSTICK),yes)
 	COPYRIGHT_MSG_AUTO += ,"/JOY"
 	ASFLAGS += -DJOYSTICK_DRIVER
 endif
 
 
-ifeq ($(BACK_TO_ORIX),LET)
-	ASFLAGS += -DBASIC_LET_IS_QUIT
-
-else ifeq ($(BACK_TO_ORIX),TRON)
-	ASFLAGS += -DBASIC_TRON_IS_QUIT
-
-else ifeq ($(BACK_TO_ORIX),TROFF)
-	ASFLAGS += -DBASIC_TROFF_IS_QUIT
+ifeq ($(BACK_TO_ORIX),yes)
+	ASFLAGS += -DBASIC_QUIT
 endif
 
 
@@ -100,6 +98,13 @@ endif
 ifneq ($(CHARSET),)
 	CHARSET :=  $(shell echo $(CHARSET) | tr a-z A-Z)
 	ASFLAGS += -DDEFAULT_CHARSET='"/USR/SHARE/FONTS/$(CHARSET)"'
+endif
+
+
+
+ifeq ($(EXPERIMENTAL),yes)
+	ASFLAGS += -DEXPERIMENTAL
+	COPYRIGHT_MSG_AUTO += ,"/E"
 endif
 
 

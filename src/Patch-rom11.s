@@ -29,7 +29,28 @@
 #define INT_SUCCESS $14
 #define INT_DISK_READ $1D
 #define INT_DISK_WRITE $1E
+#define ERR_OPEN_DIR $41
 #define ABORT $5F
+
+;---------------------------------------------------------------------------
+;
+;			Codes commande du CH376
+;
+;---------------------------------------------------------------------------
+#define CH376_CMD_CHECK_EXIST   $06
+#define CH376_CMD_SET_USB_MODE  $15
+#define CH376_CMD_GET_STATUS    $22
+#define CH376_CMD_RD_USB_DATA0  $27
+#define CH376_CMD_WR_REQ_DATA   $2d
+#define CH376_CMD_SET_FILE_NAME $2f
+#define CH376_CMD_DISK_MOUNT    $31
+#define CH376_CMD_FILE_OPEN     $32
+#define CH376_CMD_FILE_CREATE   $34
+#define CH376_CMD_FILE_CLOSE    $36
+#define CH376_CMD_BYTE_READ     $3a
+#define CH376_CMD_BYTE_RD_GO    $3b
+#define CH376_CMD_BYTE_WRITE    $3c
+#define CH376_CMD_BYTE_WR_GO    $3d
 
 ;---------------------------------------------------------------------------
 ;
@@ -79,44 +100,40 @@
 
 	;---------------------------------------------------------------------------
 	;			Commande QUIT
+	; Pris en charge par le Makefile
 	;---------------------------------------------------------------------------
-;#ifdef BASIC_LET_IS_QUIT
-;#undef BASIC_TRON_IS_QUIT
-;#undef BASIC_TROFF_IS_QUIT
-;#define BASIC_QUIT
-;#endif
+; #define BASIC_QUIT
 
-;#ifdef BASIC_TRON_IS_QUIT
-;#undef BASIC_LET_IS_QUIT
-;#undef BASIC_TROFF_IS_QUIT
-;#define BASIC_QUIT
-;#endif
+	;---------------------------------------------------------------------------
+	;				Commun
+	;---------------------------------------------------------------------------
+#define NO_CHARSET
+#define ORIX_CLI
+#define LOAD_CHARSET
 
-;#ifdef BASIC_TROFF_IS_QUIT
-;#undef BASIC_LET_IS_QUIT
-;#define BASIC_TRON_IS_QUIT
-;#define BASIC_QUIT
-;#endif
-
-#define BASIC_TRON_IS_QUIT
-#define BASIC_QUIT
+	;---------------------------------------------------------------------------
+	;			Configuration "Hobbit"
+	;---------------------------------------------------------------------------
+#ifdef HOBBIT
+#undef JOYSTICK_DRIVER
+#undef EXPERIMENTAL
+#undef LOAD_CHARSET
+#define ORIX_SIGNATURE
+#endif
 
 	;---------------------------------------------------------------------------
 	;			Gestion Joystick
+	; Pris en charge par le Makefile
 	;---------------------------------------------------------------------------
 #ifdef JOYSTICK_DRIVER
-;#define JOYSTICK_READKBDCOL
-#define JOY_TBL $f5
-#define NO_CHARSET
-#define LOAD_CHARSET
 #undef HOBBIT
-;#undef CHECKRAM_16K
 #endif
 
-#ifdef HOBBIT
-#undef JOYSTICK_DRIVER
-#define NO_CHARSET
-#undef LOAD_CHARSET
+	;---------------------------------------------------------------------------
+	;			Fonctions expérimentales
+	;---------------------------------------------------------------------------
+#ifdef EXPERIMENTAL
+#define ADD_DEF_CHAR
 #endif
 
 	;---------------------------------------------------------------------------
@@ -136,27 +153,32 @@
 ;			Variables en page 0
 ;
 ;---------------------------------------------------------------------------
+;rwpoin          = $0C			; word
+
 KBD_flag        = $2e
 INTTMP          = $33			; $33-$34: Utilisé par GetTapeData
+
+PTR1            = $91			; Pointeur utilisé notamment par les fonctions
+					; de manipulations des chaînes
+					; Utilisé ici par open_fqn()
 
 HIMEM_PTR       = $a6
 
 TXTPTR          = $e9
-rwpoin          = $0C			; word
-;PTR             = $f3
-;PTW             = $f4
-;PTR_MAX         = $f4
-;PTW             = $f5
-;PTW_MAX         = $f6
-
+JOY_TBL         = $f5
 
 ;---------------------------------------------------------------------------
 ;
 ;			Variables en page 2
 ;
 ;---------------------------------------------------------------------------
+fTextMode	= $021f			; 0:TEXT, 1:HIRES (pour DEF CHAR)
+
 RAMSIZEFLAG     = $0220
 RAMFAULT        = $0260
+
+TAPE_SPEED	= $024d			; 0: Fast, 'S': Slow (mis à jour par GetTapeParams)
+
 
 PAPER_VAL       = $026b
 INK_VAL         = $026c
@@ -168,6 +190,14 @@ HIMEM_MAX       = $02c1
 PROGSTART       = $02a9
 PROGEND         = $02ab
 PROGTYPE        = $02ae
+
+;---------------------------------------------------------------------------
+;
+;			Spécifique Multi-Part
+; Non utilisées par le BASIC
+;---------------------------------------------------------------------------
+OPENFFLAG	= $020f			; Flag pour détecter si un fichier .tap a été ouvert (0: Fichier ouvert, 1: Fichier fermé)
+MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams a été appelé)
 
 ;---------------------------------------------------------------------------
 ;
@@ -203,8 +233,17 @@ LCCD7           = $ccd7
 
 TRON            = $cd16
 
+; Pour DEF CHAR
+EvalComma	= $d065
+SyntaxError	= $d070
+DEF		= $D4BA
+DEF_USR		= $D4BE
+DEF_FN		= $D4DF
+GetByteExpr	= $d8c5
+
 TapeSync        = $e4ac
 GetTapeData     = $e4e0
+GetTapeParams   = $e7b2
 
 ClrTapeStatus   = $e5f5
 WriteFileHeader = $e607
@@ -299,7 +338,7 @@ RESET_VECTOR    = $fffc
 
 
 		;---------------------------------------------------------------------------
-		; 27 Octets
+		; 29 Octets
 		;---------------------------------------------------------------------------
 		; Ecrit un octet sur la bande
                 WriteUSBData3:
@@ -308,9 +347,9 @@ RESET_VECTOR    = $fffc
 			lda	#$01
 			ldy	#$00
 			jsr	SetByteWrite
-			;bne	fin_erreur			; TODO: /!\ Test par rapport à $1D mais SetByteWrite renvoie $14 (au moins avec Oricutron, à vérifier en réel)
+			bne	fin_erreur			; TODO: /!\ Test par rapport à INT_DISK_READ mais SetByteWrite renvoie INT_SUCCESS (au moins avec Oricutron, à vérifier en réel)
 
-                        lda     #$2d				; WriteRqData
+                        lda     #CH376_CMD_WR_REQ_DATA		; WriteRqData
                         sta     CH376_COMMAND
 			lda	CH376_DATA			; Nombre de caractère à écrire
                         lda     $2f
@@ -375,7 +414,7 @@ RESET_VECTOR    = $fffc
 		WriteUSBData2:
 		        ldy #0
 
-		        lda #$2d			; WriteReqData
+		        lda #CH376_CMD_WR_REQ_DATA	; WriteReqData
 		        sta CH376_COMMAND
 		        ldx CH376_DATA
 
@@ -396,7 +435,7 @@ RESET_VECTOR    = $fffc
 
 		; Inutile pour le moment
 ;		WriteRqData:
-;			lda	#$2d			; WriteReqData
+;			lda	#CH376_CMD_WR_REQ_DATA	; WriteReqData
 ;			sta	CH376_COMMAND
 ;			lda	CH376_DATA
 ;			rts
@@ -450,7 +489,7 @@ RESET_VECTOR    = $fffc
 		ZZZ010:
 			lda	CH376_COMMAND
 			bmi	ZZZ011
-			lda	#$22
+			lda	#CH376_CMD_GET_STATUS
 			sta	CH376_COMMAND
 			lda	CH376_DATA
 			rts
@@ -471,15 +510,19 @@ RESET_VECTOR    = $fffc
 		;										; UNTIL -;
 		;	bpl	zzz010
 		;										; CH376_COMMAND = $22;
-		;	lda	#$22
+		;	lda	#CH376_CMD_GET_STATUS
 		;	sta	CH376_COMMAND
 		;										; .A = CH376_DATA;
 		;	lda	CH376_DATA
 		;										; RETURN;
 		;	rts
 
-	; Actuellement: $E6A9
+	; Actuellement: $E6AB
 	LE6C9:
+;#print *
+#if * > $e6c9
+#print "*** ERROR PutTapeByte too long"
+#endif
 
 
 	;---------------------------------------------------------------------------
@@ -529,21 +572,31 @@ RESET_VECTOR    = $fffc
 
 	;---------------------------------------------------------------------------
 	; 10 Octets à l'emplacement de "MICROSOFT!"
+	;
+	; Spécifique MultiPart (Harrier Attack)
 	;---------------------------------------------------------------------------
-;	new_patch($e435,LE43F)
-
-;		CalcArrayLength:
-;			ldx	PROGSTART
-;			ldy	PROGSTART+1
-;			jmp	WriteLength
-;			nop
-;	LE43F:
+	new_patch($e435,LE43F)
+			; Place un flag pour la détection multipart
+			; pour certains programmes de Jeu
+	MultiPart:
+			lda	#$01
+			sta	MULTIPFLAG
+			jmp	GetTapeParams
+			nop
+			nop
+	LE43F:
 
 
 
 ;---------------------------------------------------------------------------
 ;				CLOAD
 ;---------------------------------------------------------------------------
+	;---------------------------------------------------------------------------
+	; Patch la détection multipart de certains jeux qui ne passe pas par CLOAD
+	;---------------------------------------------------------------------------
+	new_patchl((CLOAD+1),3)
+		jsr MultiPart
+
 	;---------------------------------------------------------------------------
 	; Patch l'appel à SyncTape pour détecter l'appel direct
 	;---------------------------------------------------------------------------
@@ -615,6 +668,11 @@ RESET_VECTOR    = $fffc
 	; Actuellement: $E506
 	LE50A:
 
+;#print *
+#if * > $e50a
+#print "*** ERROR GetTapeData too long"
+#endif
+
 	;---------------------------------------------------------------------------
 	; 24 Octets
 	;---------------------------------------------------------------------------
@@ -665,7 +723,7 @@ RESET_VECTOR    = $fffc
 		.(
 			;sta PTR_READ_DEST
 			;sty PTR_READ_DEST+1
-			lda	#$2f
+			lda	#CH376_CMD_SET_FILE_NAME
 			sta	CH376_COMMAND
 			sta	CH376_DATA		; Pour ouverture de '/'
 			ldy	#$ff
@@ -710,7 +768,7 @@ RESET_VECTOR    = $fffc
 			;sta	PTR_READ_DEST
 			;sty	PTR_READ_DEST+1
 
-			lda	#$2f
+			lda	#CH376_CMD_SET_FILE_NAME
 			sta	CH376_COMMAND
 			ldy	#$ff
 		ZZ0003
@@ -727,15 +785,15 @@ RESET_VECTOR    = $fffc
 		; 28 Octets
 		;---------------------------------------------------------------------------
 		Mount:
-			lda	#$31
+			lda	#CH376_CMD_DISK_MOUNT
 			.byte $2c
 
 		FileOpen:
-			lda	#$32
+			lda	#CH376_CMD_FILE_OPEN
 			.byte $2c
 
 		FileCreate:
-			lda	#$34
+			lda	#CH376_CMD_FILE_CREATE
 
 		CH376_Cmd:
 			sta	CH376_COMMAND
@@ -746,19 +804,18 @@ RESET_VECTOR    = $fffc
 			rts
 		;---------------------------------------------------------------------------
 		FileClose:
-			ldx	#$36
+			ldx	#CH376_CMD_FILE_CLOSE
 			stx	CH376_COMMAND
 			sta	CH376_DATA
 
 			clc				; Saut inconditionel
 			bcc	CH376_CmdWait
 
-
 		;---------------------------------------------------------------------------
 		; 11 Octets
 		;---------------------------------------------------------------------------
 		ByteWrGo:
-			lda	#$3d
+			lda	#CH376_CMD_BYTE_WR_GO
 			sta	CH376_COMMAND
 			jsr	WaitResponse
 			cmp	#INT_DISK_WRITE
@@ -779,13 +836,18 @@ RESET_VECTOR    = $fffc
 		; Fermeture du fichier après sauvegarde
 		;---------------------------------------------------------------------------
 		WriteClose:
-			lda #$01
-			sta $020f			; Indique pas de fichier ouvert
+			lda #$01			; Fermeture avec mise à jour
+			sta OPENFFLAG			; Indique fichier fermé
 			jsr FileClose
 			jmp LE93D
 
 	; Actuellement: $E72C
 	LE735:
+;#print *
+#if * > $e735
+#print "*** ERROR GetTapeByte too long"
+#endif
+
 
 	;---------------------------------------------------------------------------
 	; 32 Octets
@@ -837,6 +899,10 @@ RESET_VECTOR    = $fffc
 	; Actuellement: $E756
 	LE75A:
 	; WriteLeader
+;#print *
+#if * > $e75a
+#print "*** ERROR SyncTape too long"
+#endif
 
 
 ;
@@ -897,10 +963,9 @@ RESET_VECTOR    = $fffc
 		        ;sta INTTMP
 		        ;sty INTTMP+1
 
-		ReadUSBData2:
 		        ldy #0
 
-		        lda #$27
+		        lda #CH376_CMD_RD_USB_DATA0
 		        sta CH376_COMMAND
 		        ldx CH376_DATA
 
@@ -919,6 +984,10 @@ RESET_VECTOR    = $fffc
 
 	; Actuellement: $E7AB
 	LE7AF:
+;#print *
+#if * > $e7af
+#print "*** ERROR CheckFoundName too long"
+#endif
 
 ;---------------------------------------------------------------------------
 ;  8 Octets : Patch routine existante
@@ -946,11 +1015,12 @@ RESET_VECTOR    = $fffc
 ;---------------------------------------------------------------------------
 ;			Patch de la routine StartBASIC
 ;---------------------------------------------------------------------------
+#ifdef ORIX_CLI
 	new_patch((StartBASIC+$B7),LED86)
 		; jmp BackToBASIC
 		jmp ORIX_AUTOLOAD
 	LED86:
-
+#endif
 
 ;---------------------------------------------------------------------------
 ;			Patch de la routine RamTest
@@ -975,13 +1045,14 @@ RESET_VECTOR    = $fffc
 			sta	HIMEM_MAX+1
 			rts
 
+#ifdef ORIX_CLI
 		; 27 octets
 		ORIX_AUTOLOAD:
 			; InitCH376: inutile car fait pour le chargement
 			; du jeu de caractères
 			; jsr InitCH376
-			lda #$01
-			sta $020f
+			lda #$01			; Indique fichier fermé
+			sta OPENFFLAG
 			lda #<(BUFEDT+6)
 			sta TXTPTR
 			lda #>(BUFEDT+6)
@@ -991,6 +1062,7 @@ RESET_VECTOR    = $fffc
 			jsr CLOAD
 			jmp DoNextLine
 			jmp BackToBASIC
+#endif
 
 #ifdef BASIC_QUIT
 		; 25 octets (13+12)
@@ -1015,7 +1087,7 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; load_charset (36 octets)
 		;---------------------------------------------------------------------------
-		; Charge un le jeu de caractère par défaut en RAM
+		; Charge le jeu de caractères par défaut en RAM
 		;
 		; Entree:
 		;	-
@@ -1024,7 +1096,8 @@ RESET_VECTOR    = $fffc
 		;	AY: Code erreur CH376 ($41 si Ok)
 		;
 		; Modifie:
-		;	rwpoin: Pointeur vers l'adresse de chargement
+		;	PROGSTART: Pointeur vers l'adresse de chargement
+		;	PROGEND  : Pointeur vers l'adresse de fin de chargement
 		;
 		; Utilise:
 		;	-
@@ -1036,8 +1109,8 @@ RESET_VECTOR    = $fffc
 		load_charset:
 		.(
 			; Ouverture du fichier
-			ldx default_chs_len
-			lda #<default_chs
+			lda default_chs_len
+			ldx #<default_chs
 			ldy #>default_chs
 			jsr open_fqn
 			bne load_charset_error
@@ -1083,14 +1156,14 @@ RESET_VECTOR    = $fffc
 		; $fd68: '<' -> 'B'
 		InitCH376:
 		Exists:
-			ldx	#6
+			ldx	#CH376_CMD_CHECK_EXIST
 			stx	CH376_COMMAND
 			lda	#$ff
 			sta	CH376_DATA
 			lda	CH376_DATA
 			bne	InitError
 		SetUSB:
-			lda	#$15
+			lda	#CH376_CMD_SET_USB_MODE
 			sta	CH376_COMMAND
 			ldx	#CH376_USB_MODE
 			stx	CH376_DATA
@@ -1133,10 +1206,7 @@ RESET_VECTOR    = $fffc
 ;			Placé dans le jeu de caractères
 ;---------------------------------------------------------------------------
 #ifdef NO_CHARSET
-;#ifdef JOYSTICK_DRIVER
 
-; Si Détournement de l'appel ReadKbdCol
-;#ifdef JOYSTICK_READKBDCOL
 #ifndef HOBBIT
 	new_patch((CharSet+$18), CharSet_end)
 #endif
@@ -1145,9 +1215,6 @@ RESET_VECTOR    = $fffc
 ;		Patch pour le chargment du jeu de caractère par défaut
 ;			Placé dans le jeu de caractères
 ;---------------------------------------------------------------------------
-;H91 = rwpoin
-ERR_OPEN_DIR=$41
-
 ;Majuscules
 ;Minuscules
 ;' '
@@ -1219,22 +1286,28 @@ ERR_OPEN_DIR=$41
 
 
 		;---------------------------------------------------------------------------
-		; open_fqn (127 octets)
+		; open_fqn (127 octets -3)
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier (chemin absolu ou relatif sans ../)
+		; Les paramètres en entrée sont les mêmes que ceux en sortie de jsr CheckStr/ReleaseVarStr
+		; Ce qui permet d'appeler open_fqn ainsi (Cf: CD.pl65)
+		;		jsr EvalExpr
+		;		jsr CheckStr
+		;		beq erreur
+		;		jsr open_fqn
 		;
 		; Entree:
-		;	AY: Adresse de la chaine
-		;	X: Longueur de la chaine
+		;	XY: Adresse de la chaine
+		;	A: Longueur de la chaine
 		;
 		; Sortie:
 		;	AY: Code erreur CH376 ($41 si Ok)
-		;	rwpoin: Adresse de la chaine
+		;	PTR1: Adresse de la chaine
 		;
 		; Modifie:
 		;	INTTMP: Longueur de la chaine (remis à sa valeur initiale en fin de procédure)
 		;	INTTMP+1: Index dans la chaine (remis à sa valeur initiale en fin de procédure)
-		;	rwpoin: Adresse de la chaine
+		;	PTR1: Adresse de la chaine
 		;
 		; Utilise:
 		;	-
@@ -1245,13 +1318,13 @@ ERR_OPEN_DIR=$41
 		; $fcae: '&' -> '6'
 		open_fqn:
 		.(
-			sta rwpoin
-			sty rwpoin+1
+			stx PTR1
+			sty PTR1+1
 
 			; Longueur de la chaîne
-			stx INTTMP
-										; rwpoin+3 = 0;
-			lda #0
+			sta INTTMP
+										; PTR1+3 = 0;
+			lda #$00
 			sta INTTMP+1
 			; Note: InitCH376 fait un Mount USB qui replace le répertoire par
 			; defaut a '/'
@@ -1263,16 +1336,16 @@ ERR_OPEN_DIR=$41
 										; BEGIN;
 
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
-										; IF &rwpoin = '/' THEN
-			ldy #0
+										; IF &PTR1 = '/' THEN
+			ldy #$00
 			lda #'/'
-			cmp (rwpoin),Y
+			cmp (PTR1),Y
 			;beq  *+5
 			;jmp ZZ1003
 			bne ZZ1003
 										; BEGIN;
 			; Apres le test, .A contient '/' soit $2F
-										; CH376_COMMAND = .A; " SetFirwpoin+2ame";
+										; CH376_COMMAND = .A; " SetFilename";
 			sta CH376_COMMAND
 										; CH376_DATA = .A;
 			sta CH376_DATA
@@ -1284,10 +1357,10 @@ ERR_OPEN_DIR=$41
 										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
 			cmp #ERR_OPEN_DIR
 			bne CD_End
-										; INC rwpoin+3;
+										; INC PTR1+3;
 			inc INTTMP+1
 										; END;
-										; IF rwpoin+3 < rwpoin+2 THEN CH376_COMMAND = $2F; " SetFirwpoin+2ame";
+										; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFiPTR1+2ame";
 		ZZ1003:
 			lda INTTMP
 			cmp INTTMP+1
@@ -1298,7 +1371,7 @@ ERR_OPEN_DIR=$41
 			sta CH376_COMMAND
 		ZZ1004:
 			; Remplacer BCC *+5/JMP ZZnnnnn par BCS ZZnnnnn
-										; WHILE rwpoin+3 < rwpoin+2
+										; WHILE PTR1+3 < PTR1+2
 		ZZ1005:
 			lda INTTMP+1
 			cmp INTTMP
@@ -1307,11 +1380,11 @@ ERR_OPEN_DIR=$41
 			bcs ZZ0006
 										; DO;
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
-			; IF &rwpoin[rwpoin+3] = '/' THEN
-										; .Y = rwpoin+3;
+			; IF &PTR1[PTR1+3] = '/' THEN
+										; .Y = PTR1+3;
 			ldy INTTMP+1
-										; .A = @rwpoin[.Y];
-			lda (rwpoin),Y
+										; .A = @PTR1[.Y];
+			lda (PTR1),Y
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
 										; IF .A = '/' THEN
 			cmp #'/'
@@ -1320,16 +1393,16 @@ ERR_OPEN_DIR=$41
 			bne ZZ0007
 										; BEGIN;
 										; CH376_DATA = 0;
-			lda #0
+			lda #$00
 			sta CH376_DATA
 										; CALL FileOpen;
 			jsr FileOpen
 										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
 			cmp #ERR_OPEN_DIR
 			bne CD_End
-										; INC rwpoin+3;
+										; INC PTR1+3;
 			inc INTTMP+1
-											; IF rwpoin+3 < rwpoin+2 THEN CH376_COMMAND = $2F; " SetFirwpoin+2ame";
+											; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFiPTR1+2ame";
 			lda INTTMP
 			cmp INTTMP+1
 			beq  *+4
@@ -1338,15 +1411,15 @@ ERR_OPEN_DIR=$41
 			lda #$2F
 			sta CH376_COMMAND
 		ZZ0008:
-										; .Y = rwpoin+3;
+										; .Y = PTR1+3;
 			ldy INTTMP+1
-										; .A = @rwpoin[.Y];
-			lda (rwpoin),Y
+										; .A = @PTR1[.Y];
+			lda (PTR1),Y
 										; END;
 										; CH376_DATA = .A;
 		ZZ0007:
 			sta CH376_DATA
-										; INC rwpoin+3;
+										; INC PTR1+3;
 			inc INTTMP+1
 										; END;
 			jmp ZZ1005
@@ -1359,12 +1432,12 @@ ERR_OPEN_DIR=$41
 										; CD_End:
 		CD_End
 										; END;
-			; .AY = Code erreur, poids faible dans .A
+;			; .AY = Code erreur, poids faible dans .A
 		ZZ1002:
 										; .Y = .A;
-			tay
+;			tay
 										; CLEAR .A;
-			lda #0
+;			lda #$00
 										;RETURN;
 			rts
 		.)
@@ -1463,14 +1536,14 @@ ERR_OPEN_DIR=$41
 		; $fd68: '<' -> 'B'
 		InitCH376:
 		Exists:
-			ldx	#6
+			ldx	#CH376_CMD_CHECK_EXIST
 			stx	CH376_COMMAND
 			lda	#$ff
 			sta	CH376_DATA
 			lda	CH376_DATA
 			bne	InitError
 		SetUSB:
-			lda	#$15
+			lda	#CH376_CMD_SET_USB_MODE
 			sta	CH376_COMMAND
 			ldx	#CH376_USB_MODE
 			stx	CH376_DATA
@@ -1529,7 +1602,7 @@ ERR_OPEN_DIR=$41
 			jsr	SetByteRead
 			bne	fin_erreur
 
-                        lda     #$27
+                        lda     #CH376_CMD_RD_USB_DATA0
                         sta     CH376_COMMAND
 			lda	CH376_DATA			; Nombre de caractère à lire
                         lda     CH376_DATA			; Caractère lu
@@ -1543,18 +1616,20 @@ ERR_OPEN_DIR=$41
 		.)
 
 #ifdef HOBBIT
-	new_patchl($fc90,27)
+	new_patchl($fc90,32)
 #endif
 		;---------------------------------------------------------------------------
-		; 27 Octets
+		; 32 Octets
 		;---------------------------------------------------------------------------
 		; $fd8c: 'B' -> 'E'
-		SetByteRead:
-			ldx	#$3a
-			.byte $2c
-
 		SetByteWrite:
-			ldx	#$3c
+			ldx	#CH376_CMD_BYTE_WRITE
+			jsr	CH376_Cmd2
+			cmp	#INT_SUCCESS
+			rts
+
+		SetByteRead:
+			ldx	#CH376_CMD_BYTE_READ
 
 		CH376_Cmd2:
 			stx	CH376_COMMAND
@@ -1567,7 +1642,7 @@ ERR_OPEN_DIR=$41
 			rts
 		;---------------------------------------------------------------------------
 		ByteRdGo:
-			lda	#$3B
+			lda	#CH376_CMD_BYTE_RD_GO
 			sta	CH376_COMMAND
 			bne	CH376_CmdWait2
 
@@ -1604,7 +1679,7 @@ ERR_OPEN_DIR=$41
 	new_patchl($ff50,40)
 #endif
 		;---------------------------------------------------------------------------
-		; OpenForRead (17 octets)
+		; OpenForRead (17 octets) +8
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier en lecture
 		;
@@ -1615,7 +1690,8 @@ ERR_OPEN_DIR=$41
 		;	A: Code de retour du CH376
 		;
 		; Modifie:
-		;	$020f: Flag fichier ouvert
+		;	OPENFFLAG: Flag fichier ouvert/fermé
+		;	MULTIPFLAG: Flag pour le multipart
 		;
 		; Utilise:
 		;	-
@@ -1627,12 +1703,41 @@ ERR_OPEN_DIR=$41
 
 		OpenForRead:
 		.(
-			lda PROGNAME
+			lda PROGNAME			; Si CLOAD "" => fin (multipart)
+			beq fin
+#ifdef HOBBIT
+			jsr CloseOpenedFile
+			lda #$00
+#else
+			; Test pour Hellion, Frelon, Psy...
+			; Ces jeux chargent le second programme en faisant
+			; un appel direct en $E867 (Atmos)
+			; Ne peut pas être intégré dans le cas de la rom "Hobbit"
+			; car modifie des caractères utilisés par le jeu
+			; (Sauf à déplacer OpenForRead ailleurs)
+			;
+			; Test non valable dans le cas de Harrier Attack qui force TAPE_SPEED à 0 sans passer par GetTapeParams
+;			bit TAPE_SPEED
+;			bvc *+6
+;			lda #$00
+			lda MULTIPFLAG			; Si on n'est pas passé par GetTapeParams => fin (multipart, appel direct aux reoutines de la ROM)
 			beq fin
 			jsr CloseOpenedFile
 			;jsr SetFilename2
-			lda #$00
-			sta $020f
+
+			; Initialise TAPE_SPEED avec $40 pour la détection d'un CLOAD sans
+			; passer par la procédure normale (Hellion, Frelon, Psy...)
+			; TAPE_SPEED est initialisé à 0 ou 'S' par GetTapeParams
+			; (paramètres Slow)
+			; --- PAS VALABLE POUR HARRIER ATTACK ---
+;			lda #$40
+;			sta TAPE_SPEED
+			lda #$00			; Indique fichier ouvert (CLOAD "xxx", RECALL v$,"XXX")
+			sta MULTIPFLAG
+#endif
+
+;			lda #$00
+			sta OPENFFLAG			; Indique fichier ouvert
 			jmp	FileOpen
 
 		fin:
@@ -1651,7 +1756,7 @@ ERR_OPEN_DIR=$41
 		;	A: Code de retour du CH376
 		;
 		; Modifie:
-		;	$020f: Flag fichier ouvert
+		;	OPENFFLAG: Flag fichier ouvert
 		;
 		; Utilise:
 		;	-
@@ -1670,7 +1775,7 @@ ERR_OPEN_DIR=$41
 		;---------------------------------------------------------------------------
 		; CloseOpenedFile ( 17 octets)
 		;---------------------------------------------------------------------------
-		; Ouvre un fichier en écriture
+		; Ferme le fichier actuellement ouvert et prépare l'ouverture d'un fichier
 		;
 		; Entree:
 		;	-
@@ -1679,7 +1784,7 @@ ERR_OPEN_DIR=$41
 		;	-
 		;
 		; Modifie:
-		;	$020f: Flag fichier ouvert
+		;	OPENFFLAG: Flag fichier ouvert
 		;
 		; Utilise:
 		;	-
@@ -1688,11 +1793,11 @@ ERR_OPEN_DIR=$41
 		;---------------------------------------------------------------------------
 		CloseOpenedFile:
 		.(
-			lda $020f
+			lda OPENFFLAG			; Fichier ouvert?
 			bne suite
 			; Fermeture du fichier actuel
-			lda #$01
-			sta $020f
+			lda #$01			; Indique fichier fermé
+			sta OPENFFLAG
 			jsr FileClose
 		suite:
 			jsr SetFilename2
@@ -1802,6 +1907,118 @@ ERR_OPEN_DIR=$41
 		.)
 #endif
 
+#ifdef ADD_DEF_CHAR
+#echo "Add experimental DEF CHAR instruction"
+#define Token_USR  $D9
+#define Token_CHAR $B0
+
+DEF_CHAR:
+	cmp #Token_CHAR
+	beq _DEF_CHAR
+	cmp #Token_USR
+	bne *+5
+	jmp DEF_USR
+	jmp DEF_FN
+
+_DEF_CHAR:
+.(
+	lda fTextMode				; Mode TEXT?
+	bne *+5
+	lda #($b5-1)				; Adresse Jeu de caractère normal en mode TEXT: $b500-$b7ff, Jeu LORES 1: $b900-$bb7f (mais $bb00-bb7f initialisé à $55)
+	.byte $2c
+	lda #($99-1)				; Adresse Jeu de caractère normal en mode HIRES: $9900; Jeu LORES 1: $9d00
+	sta $0f
+
+	jsr GetByteExpr				; Récupère le n° du jeu de caractères
+	txa
+	beq getCharCode			; Jeu N°0 -> suite
+	cpx #$02				;
+	bcs Erreur				; >=2? -> Syntax Error
+	lda #$04				; Ici, jeu N°1, on ajoute $04 à la page du jeu de caractères
+	adc $0f
+	sta $0f
+getCharCode:
+	jsr EvalComma
+
+;
+; Version 1:
+; Prend le code ASCII du caractère suivant
+;
+;	jsr CharGet				; /!\ Récupère le caractère à redéfinir, ne peut être un ' '
+;	beq Erreur
+
+;
+; Version 2:
+; Prends la valeur d'une expression numérique
+;
+	jsr GetByteExpr+3			; Récupère une valeur [0,255]
+	txa
+
+;
+; Version 3
+; Prends le code ASCII du premier caractère d'une chaine
+; ou une valeur numérique
+;
+;	jsr EvalExpr
+;	bit $28
+;	beq numerique
+;
+;numerique:
+
+	sec
+	sbc #' '				; Doit être [0,$5f] pour le jeux normal et [0,$4d] pour le jeux LORES 1
+	bmi Erreur
+	cmp #$20
+	bmi suite
+	sbc #$20
+	inc $0f
+	cmp #$20
+	bmi suite
+	sbc #$20
+	inc $0f
+suite:
+	asl					; x2
+	asl					; x4
+	asl					; x8
+
+	clc					; +8 pour compenser le -$100 du début
+	adc #$08
+
+	sta $0e
+	bcc suite2
+	inc $0f
+
+suite2:
+	lda #$f8				; -8
+	sta $2f
+;
+; Inutile si version 2
+;	jsr CharGet				; Il faudrait ajouter un paramètre pour le N° de jeu de caractères (<0 pour réinitialisation du caractère?)
+
+	; Modifie le caractère
+	; /!\ ATTENTION: comme on ne passe pas par un buffer
+	;     le caractère sera en partie modifié en cas
+	;     d'erreur de syntaxe
+loop:
+	jsr EvalComma
+	jsr GetByteExpr+3			; Valeur en X (ILLEGAL QUANTITY si > 255)
+	ldy $2f
+	txa
+	and #$3f				; On masque les 2 premiers bits inutilisés par l'Oric :-(
+						; Ou on pourrait générer une erreur "ILLEGAL QUANTITY"
+	sta ($0e),y
+	; iny
+	; sty $00
+	inc $2f
+	bne loop
+
+	rts
+
+Erreur:
+	jmp SyntaxError				; Renvoyer une erreur 27001 si ce qui suit le LET n'est pas valide
+.)
+#endif
+
 CharSet_end:
 
 #if * > KeyCodeTab
@@ -1853,7 +2070,7 @@ CharSet_end:
 	; Pointe vers le message de Copyright
 	; Pour Telestrat (signature de la banque)
 	;
-	; /!\ ATTENTION: Frelon et Hellion testent $fff9 pour savoir si il s'agit
+	; /!\ ATTENTION: Frelon, Hellion, Harrier,... testent $fff9 pour savoir si il s'agit
 	;                d'un Atmos ($01) ou non
 	;                Pour compatibilité avec ces jeux, adresses possibles
 	;                de Copyright: $FD01 ('1'), $FE01 ('Q')ou $FF01 ('q') dans le
@@ -1861,9 +2078,10 @@ CharSet_end:
 	;                Dans ce cas, la zone $ED96-$EDC3 est disponible (ancien message)
 	;                il faut en outre modifier les instructions en $ED38 et $ED3A
 	;---------------------------------------------------------------------------
+#ifdef ORIX_SIGNATURE
 		new_patchl($fff8,2)
 				.word Copyright
-
+#endif
 
 	;---------------------------------------------------------------------------
 	; Modification pour la commande 'bank' de Orix
@@ -1890,7 +2108,7 @@ CharSet_end:
 ;			.word QUIT-1
 ;#endif
 
-#ifdef BASIC_TRON_IS_QUIT
+#ifdef BASIC_QUIT
 	;---------------------------------------------------------------------------
 	; Remplace TRON par QUIT
 	;---------------------------------------------------------------------------
@@ -1974,4 +2192,11 @@ CharSet_end:
 	jsr load_charset
 #endif
 
+;---------------------------------------------------------------------------
+;		Ajout instruction DEF CHAR
+;---------------------------------------------------------------------------
+#ifdef ADD_DEF_CHAR
+	new_patchl(DEF,3)
+	jmp DEF_CHAR
+#endif
 
