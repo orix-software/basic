@@ -25,7 +25,7 @@ endif
 
 ifeq ($(GIT_BRANCH),master)
 	GIT_BRANCH := $(shell cat ../VERSION 2>/dev/null)
-	BUILD_DATE = ""
+	BUILD_DATE =
 else
 	BUILD_DATE := $(shell date +" %d/%m %H:%M")
 endif
