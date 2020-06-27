@@ -110,6 +110,8 @@
 #define NO_CHARSET
 #define ORIX_CLI
 #define LOAD_CHARSET
+#define ORIX_SIGNATURE
+#define FORCE_ROOT_DIR
 
 	;---------------------------------------------------------------------------
 	;			Configuration "Hobbit"
@@ -244,6 +246,7 @@ GetByteExpr	= $d8c5
 TapeSync        = $e4ac
 GetTapeData     = $e4e0
 GetTapeParams   = $e7b2
+GetStoreRecallParams = $ea57
 
 ClrTapeStatus   = $e5f5
 WriteFileHeader = $e607
@@ -257,6 +260,7 @@ CheckFoundName  = $e790
 CLOAD           = $e85b
 CSAVE           = $e909
 STORE           = $e987
+RECALL          = $e9d1
 LE93D           = $e93d
 CheckKbd        = $eb78
 
@@ -335,7 +339,6 @@ RESET_VECTOR    = $fffc
 			jsr	OpenForWrite
 			jsr	WriteLeader
 			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
-
 
 		;---------------------------------------------------------------------------
 		; 29 Octets
@@ -517,7 +520,14 @@ RESET_VECTOR    = $fffc
 		;										; RETURN;
 		;	rts
 
-	; Actuellement: $E6AB
+	CloadMultiPart
+			jsr	MultiPart
+			jmp	GetTapeParams
+	RecallMultiPart
+			jsr	MultiPart
+			jmp	GetStoreRecallParams
+
+	; Actuellement: $E6B7
 	LE6C9:
 ;#print *
 #if * > $e6c9
@@ -581,7 +591,9 @@ RESET_VECTOR    = $fffc
 	MultiPart:
 			lda	#$01
 			sta	MULTIPFLAG
-			jmp	GetTapeParams
+			rts
+			nop
+			nop
 			nop
 			nop
 	LE43F:
@@ -595,7 +607,13 @@ RESET_VECTOR    = $fffc
 	; Patch la détection multipart de certains jeux qui ne passe pas par CLOAD
 	;---------------------------------------------------------------------------
 	new_patchl((CLOAD+1),3)
-		jsr MultiPart
+		jsr CloadMultiPart
+
+	;---------------------------------------------------------------------------
+	; Patch la détection multipart de certains jeux qui ne passe pas par RECALL
+	;---------------------------------------------------------------------------
+	new_patchl((RECALL+4),3)
+		jsr RecallMultiPart
 
 	;---------------------------------------------------------------------------
 	; Patch l'appel à SyncTape pour détecter l'appel direct
@@ -725,7 +743,9 @@ RESET_VECTOR    = $fffc
 			;sty PTR_READ_DEST+1
 			lda	#CH376_CMD_SET_FILE_NAME
 			sta	CH376_COMMAND
+#ifdef FORCE_ROOT_DIR
 			sta	CH376_DATA		; Pour ouverture de '/'
+#endif
 			ldy	#$ff
 		ZZ0003:
 			iny
