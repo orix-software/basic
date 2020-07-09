@@ -112,6 +112,9 @@
 #define LOAD_CHARSET
 #define ORIX_SIGNATURE
 #define FORCE_ROOT_DIR
+#undef MULTIPART_SAVE
+
+#define ROM_122
 
 	;---------------------------------------------------------------------------
 	;			Configuration "Hobbit"
@@ -121,6 +124,8 @@
 #undef EXPERIMENTAL
 #undef LOAD_CHARSET
 #define ORIX_SIGNATURE
+#undef ROM_122
+#undef MULTIPART_SAVE
 #endif
 
 	;---------------------------------------------------------------------------
@@ -229,6 +234,8 @@ BackToBASIC     = $c4a8
 DoNextLine      = $c8c1
 SetScreen       = $c82f
 
+REM             = $ca99
+
 NewLine         = $cbf0
 PrintString     = $ccb0
 LCCD7           = $ccd7
@@ -334,11 +341,21 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; Sauvegarde de l'entête
 		OpenTapeWrite:
+		.(
 			;lda #<PROGNAME			; Forcé dans SetFilename2
 			;ldy #>PROGNAME
+#ifdef MULTIPART_SAVE
+			lda	OPENFFLAG		; Fichier déjà ouvert?
+			bne	_open_file		; Non -> il faut en ouvrir un
+			lda	PROGNAME		; Nom du fichier commence par '+'?
+			cmp	#'+'
+			beq	*+5			; Oui -> mode multipart
+		_open_file
+#endif
 			jsr	OpenForWrite
 			jsr	WriteLeader
 			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
+		.)
 
 		;---------------------------------------------------------------------------
 		; 29 Octets
@@ -350,7 +367,7 @@ RESET_VECTOR    = $fffc
 			lda	#$01
 			ldy	#$00
 			jsr	SetByteWrite
-			bne	fin_erreur			; TODO: /!\ Test par rapport à INT_DISK_READ mais SetByteWrite renvoie INT_SUCCESS (au moins avec Oricutron, à vérifier en réel)
+			bne	fin_erreur			; TODO: /!\ Test par rapport à INT_SUCCESS mais SetByteWrite renvoie INT_DISK_WRITE si on écrit un seul octet
 
                         lda     #CH376_CMD_WR_REQ_DATA		; WriteRqData
                         sta     CH376_COMMAND
@@ -527,7 +544,7 @@ RESET_VECTOR    = $fffc
 			jsr	MultiPart
 			jmp	GetStoreRecallParams
 
-	; Actuellement: $E6B7
+	; Actuellement: $E6C3 si MULTIPART_SAVE
 	LE6C9:
 ;#print *
 #if * > $e6c9
@@ -567,6 +584,7 @@ RESET_VECTOR    = $fffc
 		.)
 	LE76A:
 
+#ifndef MULTIPART_SAVE
 	;---------------------------------------------------------------------------
 	; Patche du CSAVE pour clore le fichier après la sauvegarde
 	;---------------------------------------------------------------------------
@@ -578,7 +596,7 @@ RESET_VECTOR    = $fffc
 	;---------------------------------------------------------------------------
 	new_patchl((STORE+69),3)
 		jsr WriteClose
-
+#endif
 
 	;---------------------------------------------------------------------------
 	; 10 Octets à l'emplacement de "MICROSOFT!"
@@ -855,13 +873,15 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; Fermeture du fichier après sauvegarde
 		;---------------------------------------------------------------------------
+#ifndef MULTIPART_SAVE
 		WriteClose:
 			lda #$01			; Fermeture avec mise à jour
 			sta OPENFFLAG			; Indique fichier fermé
 			jsr FileClose
 			jmp LE93D
-
-	; Actuellement: $E72C
+#endif
+	; Actuellement: $E72C si not defined(MULTIPART_SAVE)
+	; Actuellement: $E721 si defined(MULTIPART_SAVE)
 	LE735:
 ;#print *
 #if * > $e735
@@ -1147,7 +1167,7 @@ RESET_VECTOR    = $fffc
 			sta PROGEND
 			sty PROGEND+1
 
-			; Chargement du jeux de caractères
+			; Chargement du jeu de caractères
 			jsr GetTapeData
 
 		load_charset_error:
@@ -1306,7 +1326,7 @@ RESET_VECTOR    = $fffc
 
 
 		;---------------------------------------------------------------------------
-		; open_fqn (127 octets -3)
+		; open_fqn (107 octets -3)
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier (chemin absolu ou relatif sans ../)
 		; Les paramètres en entrée sont les mêmes que ceux en sortie de jsr CheckStr/ReleaseVarStr
@@ -1370,23 +1390,30 @@ RESET_VECTOR    = $fffc
 										; CH376_DATA = .A;
 			sta CH376_DATA
 										; CH376_DATA = $00;
-			lda #$00
-			sta CH376_DATA
+;			lda #$00
+;			sta CH376_DATA
 										; CALL FileOpen; " Detruit X et Y";
-			jsr FileOpen
+;			jsr FileOpen
+; Optimisation taille: Gain 5 Octets
+			jsr ZZ0006
 										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
 			cmp #ERR_OPEN_DIR
 			bne CD_End
 										; INC PTR1+3;
 			inc INTTMP+1
 										; END;
-										; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFiPTR1+2ame";
+										; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFilename";
 		ZZ1003:
-			lda INTTMP
-			cmp INTTMP+1
-			beq  *+4
-			bcs  *+5
-			jmp ZZ1004
+;			lda INTTMP
+;			cmp INTTMP+1
+;			beq  *+4
+;			bcs  *+5
+;			jmp ZZ1004
+; Optimisation en inversant le test: Gain 5 Octets
+			lda INTTMP+1
+			cmp INTTMP
+			bcs ZZ0006
+
 			lda #$2F
 			sta CH376_COMMAND
 		ZZ1004:
@@ -1413,21 +1440,28 @@ RESET_VECTOR    = $fffc
 			bne ZZ0007
 										; BEGIN;
 										; CH376_DATA = 0;
-			lda #$00
-			sta CH376_DATA
+;			lda #$00
+;			sta CH376_DATA
 										; CALL FileOpen;
-			jsr FileOpen
+;			jsr FileOpen
+; Optimisation taille: Gain 5 Octets
+			jsr ZZ0006
 										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
 			cmp #ERR_OPEN_DIR
 			bne CD_End
 										; INC PTR1+3;
 			inc INTTMP+1
 											; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFiPTR1+2ame";
-			lda INTTMP
-			cmp INTTMP+1
-			beq  *+4
-			bcs  *+5
-			jmp ZZ0008
+;			lda INTTMP
+;			cmp INTTMP+1
+;			beq  *+4
+;			bcs  *+5
+;			jmp ZZ0008
+; Optimisation en inversant le test: Gain 5 Octets
+			lda INTTMP+1
+			cmp INTTMP
+			bcs ZZ0008
+
 			lda #$2F
 			sta CH376_COMMAND
 		ZZ0008:
@@ -1443,6 +1477,7 @@ RESET_VECTOR    = $fffc
 			inc INTTMP+1
 										; END;
 			jmp ZZ1005
+
 		ZZ0006:
 										; CH376_DATA = $00;
 			lda #$00
@@ -1673,7 +1708,7 @@ RESET_VECTOR    = $fffc
 		; (24 octets)
 		;---------------------------------------------------------------------------
 		;
-		; Efface la ligne de status + 'OUT OF DATA ERROR'
+		; Efface la ligne de status + 'FILE NOT FOUND ERROR'
 		; Utilisé pour indiquer une erreur lors de la lecure d'un fichier
 		;---------------------------------------------------------------------------
 		; $fda7: 'F' -> 'H'
@@ -1740,7 +1775,7 @@ RESET_VECTOR    = $fffc
 ;			bit TAPE_SPEED
 ;			bvc *+6
 ;			lda #$00
-			lda MULTIPFLAG			; Si on n'est pas passé par GetTapeParams => fin (multipart, appel direct aux reoutines de la ROM)
+			lda MULTIPFLAG			; Si on n'est pas passé par GetTapeParams => fin (multipart, appel direct aux routines de la ROM)
 			beq fin
 			jsr CloseOpenedFile
 			;jsr SetFilename2
@@ -2083,6 +2118,16 @@ CharSet_end:
 
 
 ;---------------------------------------------------------------------------
+;			Modifications ROM 1.22
+;---------------------------------------------------------------------------
+#ifdef ROM_122
+	;---------------------------------------------------------------------------
+	; Correction bug IF/THEN/ELSE
+	;---------------------------------------------------------------------------
+		new_patchl($c93c,3)
+				jsr	REM
+#endif
+;---------------------------------------------------------------------------
 ;			Modifications pour Orix
 ;---------------------------------------------------------------------------
 
@@ -2092,11 +2137,6 @@ CharSet_end:
 	;
 	; /!\ ATTENTION: Frelon, Hellion, Harrier,... testent $fff9 pour savoir si il s'agit
 	;                d'un Atmos ($01) ou non
-	;                Pour compatibilité avec ces jeux, adresses possibles
-	;                de Copyright: $FD01 ('1'), $FE01 ('Q')ou $FF01 ('q') dans le
-	;                jeu de caractères.
-	;                Dans ce cas, la zone $ED96-$EDC3 est disponible (ancien message)
-	;                il faut en outre modifier les instructions en $ED38 et $ED3A
 	;---------------------------------------------------------------------------
 #ifdef ORIX_SIGNATURE
 		new_patchl($fff8,2)
