@@ -257,6 +257,7 @@ GetStoreRecallParams = $ea57
 
 ClrTapeStatus   = $e5f5
 WriteFileHeader = $e607
+LE62A           = WriteFileHeader+35
 PutTapeByte     = $e65e
 WriteLeader     = $e75a
 GetTapeByte     = $e6c9
@@ -306,6 +307,14 @@ RESET_VECTOR    = $fffc
 
 		-WriteFileHeader:
 			jmp OpenTapeWrite
+
+	;---------------------------------------------------------------------------
+	; Supprime une boucle de délai (utile uniquement pour les K7)
+	;---------------------------------------------------------------------------
+	new_patchl(LE62A,3)
+			nop
+			nop
+			nop
 
 	;---------------------------------------------------------------------------
 	; 14 Octets
@@ -367,6 +376,7 @@ RESET_VECTOR    = $fffc
 			lda	#$01
 			ldy	#$00
 			jsr	SetByteWrite
+			cmp	#INT_DISK_WRITE
 			bne	fin_erreur			; TODO: /!\ Test par rapport à INT_SUCCESS mais SetByteWrite renvoie INT_DISK_WRITE si on écrit un seul octet
 
                         lda     #CH376_CMD_WR_REQ_DATA		; WriteRqData
@@ -642,10 +652,12 @@ RESET_VECTOR    = $fffc
 
 	new_patch(GetTapeData,LE50A)
 		;---------------------------------------------------------------------------
-		; _GetTapeData (43 octets / 43 octets pour la version BASIC 1.1)
+		; GetTapeData (43 octets / 43 octets pour la version BASIC 1.1)
 		;---------------------------------------------------------------------------
 		; Charge un programme en mémoire
-		; Doit être appelé APRES SetByteRead
+		;
+		; NOTE: si ce patch est activé, la commande CLOAD "xxx",V renverra
+		;       toujours "0 Verify errors detected"
 		;
 		; Entree:
 		;	AY: Adresse de chargement
@@ -657,7 +669,8 @@ RESET_VECTOR    = $fffc
 		;	INTTMP: Pointeur adresse de chargement
 		;
 		; Utilise:
-		;	-
+		;	PROGSTART
+		;
 		; Sous-routines:
 		;	ReadUSBData
 		;	ByteRdGo
