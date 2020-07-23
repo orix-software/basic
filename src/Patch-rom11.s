@@ -132,10 +132,6 @@
 #undef ROM_122
 #undef MULTIPART_SAVE
 
-	; Poopy copie la routine GetTapeData et la modifie
-	; Donc on ne peut pas avoir une lecture par blocs pour Poopy
-;#undef FAST_LOAD
-
 	; Cyclotron modifie l'octet en $99, donc on doit forcer le mode du CH376
 ;#undef AUTO_USB_MODE
 
@@ -703,12 +699,14 @@ RESET_VECTOR    = $fffc
 
 	new_patch(GetTapeData,LE50A)
 		;---------------------------------------------------------------------------
-		; GetTapeData (43 octets / 43 octets pour la version BASIC 1.1)
+		; GetTapeData (40 octets avec les nop / 43 octets pour la version BASIC 1.1)
 		;---------------------------------------------------------------------------
 		; Charge un programme en mémoire
 		;
-		; NOTE: si ce patch est activé, la commande CLOAD "xxx",V renverra
-		;       toujours "0 Verify errors detected"
+		; NOTE: - si ce patch est activé, la commande CLOAD "xxx",V est
+		;         désactivée et renverra "SYNTAX ERROR"
+		;
+		;       - Poopy copie cette routine en $A410 et la modifie
 		;
 		; Entree:
 		;	AY: Adresse de chargement
@@ -736,36 +734,35 @@ RESET_VECTOR    = $fffc
 			sta INTTMP
 			sty INTTMP+1
 
-			; Boucle de chargement de la fonte (27 octets)
+			; Boucle de chargement du fichier (25 octets avec les 3 nop)
 		loop:
-			; On peut supprimer les lda/ldy si on supprime les sta/sty de ReadUSBData
-			;lda INTTMP
-			;ldy INTTMP+1
 			jsr ReadUSBData
-
-			;clc
-			;bcs ReadNextChunk
-			cpy #$00		; Nombre d'octets lus == 0?
-			beq fin
+			bcs fin
 
 			; Ajuste le pointeur
-			clc
 			tya
+#ifdef GAMES
+			bne *+4				; Saute les 2 octets suivants
+			nop					; Poopy place $35 ici
+			nop					; Poopy place $A4 ici
+#endif
 			adc INTTMP
 			sta INTTMP
 			bcc *+4
 			inc INTTMP+1
 
-		ReadNextChunk:
 			jsr ByteRdGo
 			beq loop
 
 		fin:
 		_GetTapeData_error:
-			rts
+			rts					; Poopy place $60 ici :)
+#ifdef GAMES
+			nop					; Poopy place $A4 ici
+#endif
 		.)
 
-	; Actuellement: $E506
+	; Actuellement: $E503, $E508 si GAMES
 	LE50A:
 
 ;#print *
@@ -1040,9 +1037,9 @@ RESET_VECTOR    = $fffc
 		rts
 
 
-	new_patchl(CheckFoundName+5,22)
+	new_patchl(CheckFoundName+5,25)
 		;---------------------------------------------------------------------------
-		; ReadUSBData(22 octets)
+		; ReadUSBData(25 octets)
 		;---------------------------------------------------------------------------
 		; Charge un bloc en mémoire
 		;
@@ -1050,6 +1047,7 @@ RESET_VECTOR    = $fffc
 		;	AY: Adresse de chargement
 		;
 		; Sortie:
+		;	C: 0->Ok, 1->aucun octet lu
 		;	A: Modifié
 		;	X: 0
 		;	Y: Nombre d'octets lus
@@ -1083,12 +1081,14 @@ RESET_VECTOR    = $fffc
 		        iny
 		        dex
 		        bne ZZZ003
-
+                        clc
+                        .byte $24
 		ZZZ002:
+			sec
 		        rts
 		.)
 
-	; Actuellement: $E7AB
+	; Actuellement: $E7AE
 	LE7AF:
 ;#print *
 #if * > $e7af
@@ -1711,6 +1711,7 @@ RESET_VECTOR    = $fffc
 		;	-
 		;
 		; Sortie:
+		;	C: 0->Ok, 1-> Erreur
 		;	A: Caractère lu
 		;	$2f: Caractère lu
 		;
