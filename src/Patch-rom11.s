@@ -111,7 +111,7 @@
 #define ORIX_CLI
 #define LOAD_CHARSET
 #define ORIX_SIGNATURE
-#define FORCE_ROOT_DIR
+#undef FORCE_ROOT_DIR
 #define ROOT_DIR "/USR/SHARE/BASIC/"
 #define FAST_LOAD
 #define ROM_122
@@ -126,8 +126,8 @@
 #ifdef GAMES
 #undef HOBBIT
 #undef ORIX_SIGNATURE
-;#undef FORCE_ROOT_DIR
-;#define ROOT_DIR "/USR/SHARE/GAMES/"
+#undef FORCE_ROOT_DIR
+#define ROOT_DIR "/USR/SHARE/GAMES/"
 #undef EXPERIMENTAL
 #undef ROM_122
 #undef MULTIPART_SAVE
@@ -142,7 +142,8 @@
 	;---------------------------------------------------------------------------
 #ifdef HOBBIT
 #undef JOYSTICK_DRIVER
-;#undef FORCE_ROOT_DIR
+#define FORCE_ROOT_DIR
+#undef ROOT_DIR
 ;#define ROOT_DIR "/USR/SHARE/GAMES/"
 #undef EXPERIMENTAL
 #undef LOAD_CHARSET
@@ -177,7 +178,7 @@
 #define DEFAULT_CHARSET ROOT_DIR,"DEFAULT.CHS"
 #endif
 #endif
-#echo "Default charset: DEFAULT_CHARSET"
+#echo "Default charset:" DEFAULT_CHARSET
 #endif
 #endif
 
@@ -1701,11 +1702,15 @@ RESET_VECTOR    = $fffc
 ; [---
 #ifdef HOBBIT
 	new_patchl($fcb8, 29)
+;	new_patchl($fcb8, 20)
 #endif
 		;---------------------------------------------------------------------------
 		; ReadUSBData3 (29 octets)
 		;---------------------------------------------------------------------------
 		; Lit un caractère depuis la K7
+		;
+		; Note: Optimisation impossible pour Hobbit qui utilise INTTMP pendant le
+		;       chargement (Lone Raider aussi).
 		;
 		; Entree:
 		;	-
@@ -1713,10 +1718,12 @@ RESET_VECTOR    = $fffc
 		; Sortie:
 		;	C: 0->Ok, 1-> Erreur
 		;	A: Caractère lu
+		;	X: 0
+		;	Y: 1
 		;	$2f: Caractère lu
 		;
 		; Modifie:
-		;	$2f: Caractère lu
+		;	INTTMP: valeur: $002f
 		;
 		; Utilise:
 		;	-
@@ -1729,9 +1736,10 @@ RESET_VECTOR    = $fffc
 			; On lit 1 caractère
 			lda	#$01
 			ldy	#$00
+;			sty	INTTMP+1
 			jsr	SetByteRead
 			bne	fin_erreur
-
+#if 1
                         lda     #CH376_CMD_RD_USB_DATA0
                         sta     CH376_COMMAND
 			lda	CH376_DATA			; Nombre de caractère à lire
@@ -1740,6 +1748,11 @@ RESET_VECTOR    = $fffc
 			jsr     ByteRdGo			; Nécessaire en réel, sinon le CH376 boucle sur son buffer
 			clc					; Indique pas d'erreur de lecture
 			.byte $24
+#else
+			lda	#$2f				; On veut le caractère lu dans $2F
+			sta	INTTMP
+			jmp	ReadUSBData
+#endif
 		fin_erreur:
 			sec
                         rts
