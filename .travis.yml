@@ -23,8 +23,8 @@ install:
     - popd
 
 script:
-	- HOBBIT=yes make && make clean && GAMES=yes make && make clean && make
-	- USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make
+    - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make
+    - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make
 
 after_success:
         - VERSION=`cat VERSION`
