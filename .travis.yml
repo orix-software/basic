@@ -13,8 +13,8 @@ install:
     # - sudo apt-get install -qq curl
     # - sudo apt-get install -qq git
     - sudo pip install --upgrade pip
-    pip install pathlib
-    pip install pycurl
+    - pip install pathlib
+    - pip install pycurl
     # - sudo pip install mkdocs
     # - git clone https://github.com/oric-software/buildTestAndRelease.git
     # - cd buildTestAndRelease/ && sh make.sh
