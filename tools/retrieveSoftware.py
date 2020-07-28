@@ -10,8 +10,8 @@ import pathlib
 from shutil import copyfile
 
 
-dest="orix/usr/share/basic"
-destetc="orix/etc/basic/"
+dest="../orix/usr/share/basic"
+destetc="../orix/etc/basic/"
 #exist_ok=True
 #pathlib.Path(dest).mkdir(parents=True)
 
@@ -94,12 +94,12 @@ for i in range(len(datastore)):
 
         if extension=="zip":
             print("zip")
-            with zipfile.ZipFile("orix/"+tail, 'r') as zip_ref:
+            with zipfile.ZipFile("../orix/"+tail, 'r') as zip_ref:
                 zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
             print("tap")
-            print("orix/"+tail,dest+"/"+letter+"/"+tail.lower())
-            copyfile("orix/"+tail,dest+"/"+rombasic11+"/"+letter+"/"+tail.lower() )
+            print("../orix/"+tail,dest+"/"+letter+"/"+tail.lower())
+            copyfile("../orix/"+tail,dest+"/"+rombasic11+"/"+letter+"/"+tail.lower() )
         if not os.path.exists(destetc+"/"+letter):
             os.mkdir(destetc+"/"+letter)
         tcnf=tail.lower().split('.')
