@@ -9,10 +9,12 @@ addons:
                         - curl
 
 install:
-    # - sudo apt-get update -qq
+    - sudo apt-get update -qq
     # - sudo apt-get install -qq curl
     # - sudo apt-get install -qq git
-    # - sudo pip install --upgrade pip
+    - sudo pip install --upgrade pip
+    pip install pathlib
+    pip install pycurl
     # - sudo pip install mkdocs
     # - git clone https://github.com/oric-software/buildTestAndRelease.git
     # - cd buildTestAndRelease/ && sh make.sh
@@ -26,5 +28,9 @@ after_success:
         - VERSION=`cat VERSION`
         - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basicsd.rom orix/usr/share/basic/$VERSION/basicsd.rom
         - mkdir -p orix/etc/orixcfg/$VERSION/ && echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
+        - mkdir -p orix/etc/basic/
+        - mkdir -p orix/usr/share/basic/0/
+        - mkdir -p orix/usr/share/basic/1/
+        - mkdir -p orix/usr/share/basic/2/
         - cd orix && tar -zcvf ../basic.tgz * && cd ..
         - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
