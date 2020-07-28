@@ -80,7 +80,7 @@ for i in range(len(datastore)):
 
         head, tail = os.path.split(tapefile)
 
-        f = open("orix"+"/"+tail, "wb")
+        f = open("../orix"+"/"+tail, "wb")
         f.write(get_body_tape)
         f.close()
         #tail=tail.lower()
