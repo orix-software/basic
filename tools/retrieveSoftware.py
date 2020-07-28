@@ -85,7 +85,7 @@ for i in range(len(datastore)):
         f.close()
         #tail=tail.lower()
         letter=tail[0:1].lower()
-        folder=dest+'/'+letter
+        folder=dest+'/'+rombasic11+"/"+letter
         print(folder)
         directory = os.path.dirname(folder)
         if not os.path.exists(folder):
