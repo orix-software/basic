@@ -12,9 +12,9 @@ install:
     - sudo apt-get update -qq
     # - sudo apt-get install -qq curl
     # - sudo apt-get install -qq git
-    - sudo pip install --upgrade pip
-    - pip install pathlib
-    - pip install pycurl
+    - sudo apt-get install python3 python3-pip
+    - sudo python3 -m pip install pathlib
+    - sudo python3 -m pip install pycurl
     # - sudo pip install mkdocs
     # - git clone https://github.com/oric-software/buildTestAndRelease.git
     # - cd buildTestAndRelease/ && sh make.sh
@@ -32,8 +32,8 @@ after_success:
         - mkdir -p orix/usr/share/basic/0/
         - mkdir -p orix/usr/share/basic/1/
         - mkdir -p orix/usr/share/basic/2/
-        - python --version
-        - cd tools/ && python retrieveSoftware.py && cd ..
+        - python3 --version
+        - cd tools/ && python3 retrieveSoftware.py && cd ..
         - ls -l
         - cd orix && tar -zcvf ../basic.tgz * && cd ..
         - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
