@@ -86,7 +86,10 @@ for i in range(len(datastore)):
         tail = tail.replace(")", "")
         ttail=tail.split(".")
         tail=ttail[0]
-        tail=tail[0:8]+"."+ttail[1]
+        if len(tail)>8:
+            tail=tail[0:8]+"."+ttail[1]
+        else:
+            tail=tail+"."+ttail[1]
         letter=tail[0:1].lower()
         print("tail="+tail)
 
