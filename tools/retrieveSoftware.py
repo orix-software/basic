@@ -80,9 +80,6 @@ for i in range(len(datastore)):
 
         head, tail = os.path.split(tapefile)
 
-        f = open(tail, "wb")
-        f.write(get_body_tape)
-        f.close()
         tail=tail.lower()
         tail = tail.replace(" ", "")
         tail = tail.replace("(", "")
@@ -92,6 +89,11 @@ for i in range(len(datastore)):
         tail=tail[0:8]+"."+ttail[1]
         letter=tail[0:1].lower()
         print("tail="+tail)
+
+        f = open(tail, "wb")
+        f.write(get_body_tape)
+        f.close()
+
         folder=dest+'/'+rombasic11+"/"+letter
         print(folder)
         directory = os.path.dirname(folder)
