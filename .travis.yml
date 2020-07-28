@@ -13,7 +13,7 @@ install:
     # - sudo apt-get install -qq curl
     # - sudo apt-get install -qq git
     - sudo apt-get install python3 python3-pip
-    - sudo apt-get install setuptools
+    - sudo apt-get install python3-setuptools
     - sudo python3 -m pip install pathlib
     - sudo python3 -m pip install pycurl
     # - sudo pip install mkdocs
