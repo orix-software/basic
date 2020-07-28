@@ -80,7 +80,7 @@ for i in range(len(datastore)):
 
         head, tail = os.path.split(tapefile)
 
-        f = open("../orix"+"/"+tail, "wb")
+        f = open(tail, "wb")
         f.write(get_body_tape)
         f.close()
         #tail=tail.lower()
@@ -99,7 +99,7 @@ for i in range(len(datastore)):
         if extension=="tap":
             print("tap")
             print("../orix/"+tail,dest+"/"+letter+"/"+tail.lower())
-            copyfile("../orix/"+tail,dest+"/"+rombasic11+"/"+letter+"/"+tail.lower() )
+            copyfile(tail,dest+"/"+rombasic11+"/"+letter+"/"+tail.lower() )
             skip=1
         if skip==1:
             if not os.path.exists(destetc+"/"+letter):
