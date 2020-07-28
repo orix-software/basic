@@ -55,7 +55,7 @@ for i in range(len(datastore)):
     if tapefile!="":
         b_obj_tape = BytesIO() 
         crl_tape = pycurl.Curl() 
-
+        skip=0
         # Set URL value
         crl_tape.setopt(crl_tape.URL, 'https://cdn.oric.org//games/software/'+tapefile)
         crl_tape.setopt(crl_tape.SSL_VERIFYHOST, 0)
@@ -90,29 +90,31 @@ for i in range(len(datastore)):
         directory = os.path.dirname(folder)
         if not os.path.exists(folder):
             os.mkdir(folder)
-            print("######################## Create "+directory)
+            print("######################## Create "+folder)
 
         if extension=="zip":
             print("zip")
-            with zipfile.ZipFile("../orix/"+tail, 'r') as zip_ref:
-                zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
+            #with zipfile.ZipFile("../orix/"+tail, 'r') as zip_ref:
+            #    zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
             print("tap")
             print("../orix/"+tail,dest+"/"+letter+"/"+tail.lower())
             copyfile("../orix/"+tail,dest+"/"+rombasic11+"/"+letter+"/"+tail.lower() )
-        if not os.path.exists(destetc+"/"+letter):
-            os.mkdir(destetc+"/"+letter)
-        tcnf=tail.lower().split('.')
-        cnf=tcnf[0]+".cnf"
+            skip=1
+        if skip==1:
+            if not os.path.exists(destetc+"/"+letter):
+                os.mkdir(destetc+"/"+letter)
+            tcnf=tail.lower().split('.')
+            cnf=tcnf[0]+".cnf"
 
-        f = open(destetc+"/"+letter+"/"+cnf, "w")
-        f.write("rom="+rombasic11+"\n")
-        f.write("up="+up_joy+"\n")
-        f.write("down="+down_joy+"\n")
-        f.write("right="+right_joy+"\n")
-        f.write("left="+left_joy+"\n")
-        f.write("fire1="+fire1_joy+"\n")
-        f.write("fire2="+fire2_joy+"\n")        
-        f.close() 
+            f = open(destetc+"/"+letter+"/"+cnf, "w")
+            f.write("rom="+rombasic11+"\n")
+            f.write("up="+up_joy+"\n")
+            f.write("down="+down_joy+"\n")
+            f.write("right="+right_joy+"\n")
+            f.write("left="+left_joy+"\n")
+            f.write("fire1="+fire1_joy+"\n")
+            f.write("fire2="+fire2_joy+"\n")        
+            f.close() 
 
         exit
