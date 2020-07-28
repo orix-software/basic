@@ -33,8 +33,6 @@ after_success:
         - mkdir -p orix/usr/share/basic/0/
         - mkdir -p orix/usr/share/basic/1/
         - mkdir -p orix/usr/share/basic/2/
-        - python3 --version
         - cd tools/ && python3 retrieveSoftware.py && cd ..
-        - ls -l
         - cd orix && tar -zcvf ../basic.tgz * && cd ..
         - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
