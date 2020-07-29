@@ -44,14 +44,25 @@ endif
 #
 # Copyright par défaut
 #
+#COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+
 ifeq ($(HOBBIT),yes)
 	COPYRIGHT_MSG_AUTO = "Hobbit BASIC 1.1"
 	ASFLAGS += -DHOBBIT=yes
-	PROJECT = basicsd-hobbit
+	ROMID := 0
 	JOYSTICK = no
 	EXPERIMENTAL = no
 else
-	COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+	ifeq ($(GAMES),yes)
+		COPYRIGHT_MSG_AUTO = "Games BASIC 1.1"
+		ASFLAGS += -DGAMES=yes
+		ROMID := 1
+		JOYSTICK = yes
+		EXPERIMENTAL = no
+	else
+		COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+		ROMID := 2
+	endif
 endif
 
 #
@@ -59,12 +70,12 @@ endif
 #
 
 ifeq ($(USB_MODE),sdcard)
-	PROJECT = basicsd
+	PROJECT = basicsd$(ROMID)
 	# COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1 SD v$(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)"
 	COPYRIGHT_MSG_AUTO += ," SD"
 	ASFLAGS += -DCH376_USB_MODE=3
 else
-	PROJECT = basicusb
+	PROJECT = basicus$(ROMID)
 	# COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1 USB v$(PROJECT_VERSION_MAJ).$(PROJECT_VERSION_MIN)"
 	COPYRIGHT_MSG_AUTO += ," USB"
 	ASFLAGS += -DCH376_USB_MODE=6

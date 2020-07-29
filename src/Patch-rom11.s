@@ -105,20 +105,50 @@
 ; #define BASIC_QUIT
 
 	;---------------------------------------------------------------------------
-	;				Commun
+	;				Défaut
 	;---------------------------------------------------------------------------
 #define NO_CHARSET
 #define ORIX_CLI
 #define LOAD_CHARSET
+#define ORIX_SIGNATURE
+#undef FORCE_ROOT_DIR
+#define ROOT_DIR "/USR/SHARE/BASIC/"
+#define FAST_LOAD
+#define ROM_122
+#undef AUTO_USB_MODE
+
+#undef MULTIPART_SAVE
+
+
+	;---------------------------------------------------------------------------
+	;			Configuration "Games"
+	;---------------------------------------------------------------------------
+#ifdef GAMES
+#undef HOBBIT
+#undef ORIX_SIGNATURE
+#undef FORCE_ROOT_DIR
+#define ROOT_DIR "/USR/SHARE/GAMES/"
+#undef EXPERIMENTAL
+#undef ROM_122
+#undef MULTIPART_SAVE
+
+	; Cyclotron modifie l'octet en $99, donc on doit forcer le mode du CH376
+;#undef AUTO_USB_MODE
+
+#endif
 
 	;---------------------------------------------------------------------------
 	;			Configuration "Hobbit"
 	;---------------------------------------------------------------------------
 #ifdef HOBBIT
 #undef JOYSTICK_DRIVER
+#define FORCE_ROOT_DIR
+#undef ROOT_DIR
+;#define ROOT_DIR "/USR/SHARE/GAMES/"
 #undef EXPERIMENTAL
 #undef LOAD_CHARSET
-#define ORIX_SIGNATURE
+#undef ROM_122
+#undef MULTIPART_SAVE
 #endif
 
 	;---------------------------------------------------------------------------
@@ -142,9 +172,13 @@
 #ifdef NO_CHARSET
 #ifdef LOAD_CHARSET
 #ifndef DEFAULT_CHARSET
+#ifdef FORCE_ROOT_DIR
 #define DEFAULT_CHARSET "/USR/SHARE/FONTS/DEFAULT.CHS"
+#else
+#define DEFAULT_CHARSET ROOT_DIR,"DEFAULT.CHS"
 #endif
-#echo "Default charset: DEFAULT_CHARSET"
+#endif
+#echo "Default charset:" DEFAULT_CHARSET
 #endif
 #endif
 
@@ -161,6 +195,12 @@ INTTMP          = $33			; $33-$34: Utilisé par GetTapeData
 PTR1            = $91			; Pointeur utilisé notamment par les fonctions
 					; de manipulations des chaînes
 					; Utilisé ici par open_fqn()
+
+#ifdef AUTO_USB_MODE
+CH376_MODE	= $99			; Mis à jour par Orix lors de l'appel
+					; à la rom
+					; /!\ doit être 3 ou 6, pas de vérification
+#endif
 
 HIMEM_PTR       = $a6
 
@@ -179,6 +219,8 @@ RAMFAULT        = $0260
 
 TAPE_SPEED	= $024d			; 0: Fast, 'S': Slow (mis à jour par GetTapeParams)
 
+MERGEFLG	= $025a
+VERIFYFLG	= $025b
 
 PAPER_VAL       = $026b
 INK_VAL         = $026c
@@ -227,6 +269,8 @@ BackToBASIC     = $c4a8
 DoNextLine      = $c8c1
 SetScreen       = $c82f
 
+REM             = $ca99
+
 NewLine         = $cbf0
 PrintString     = $ccb0
 LCCD7           = $ccd7
@@ -244,9 +288,11 @@ GetByteExpr	= $d8c5
 TapeSync        = $e4ac
 GetTapeData     = $e4e0
 GetTapeParams   = $e7b2
+GetStoreRecallParams = $ea57
 
 ClrTapeStatus   = $e5f5
 WriteFileHeader = $e607
+LE62A           = WriteFileHeader+35
 PutTapeByte     = $e65e
 WriteLeader     = $e75a
 GetTapeByte     = $e6c9
@@ -254,9 +300,14 @@ SyncTape        = $e735
 SetupTape       = $e76a
 CheckFoundName  = $e790
 
+#ifdef FAST_LOAD
+LE810		= $e810
+#endif
+
 CLOAD           = $e85b
 CSAVE           = $e909
 STORE           = $e987
+RECALL          = $e9d1
 LE93D           = $e93d
 CheckKbd        = $eb78
 
@@ -294,7 +345,15 @@ RESET_VECTOR    = $fffc
 	new_patchl(WriteFileHeader,3)
 
 		-WriteFileHeader:
-			jmp OpenTapeWrite
+			jsr OpenTapeWrite
+
+	;---------------------------------------------------------------------------
+	; Supprime une boucle de délai (utile uniquement pour les K7)
+	;---------------------------------------------------------------------------
+	new_patchl(LE62A,3)
+			nop
+			nop
+			nop
 
 	;---------------------------------------------------------------------------
 	; 14 Octets
@@ -326,16 +385,26 @@ RESET_VECTOR    = $fffc
 		.)
 
 		;---------------------------------------------------------------------------
-		; 9 Octets
+		; 6 Octets
 		;---------------------------------------------------------------------------
 		; Sauvegarde de l'entête
 		OpenTapeWrite:
+		.(
 			;lda #<PROGNAME			; Forcé dans SetFilename2
 			;ldy #>PROGNAME
+#ifdef MULTIPART_SAVE
+			lda	OPENFFLAG		; Fichier déjà ouvert?
+			bne	_open_file		; Non -> il faut en ouvrir un
+			lda	PROGNAME		; Nom du fichier commence par '+'?
+			cmp	#'+'
+			beq	*+5			; Oui -> mode multipart
+		_open_file
+#endif
 			jsr	OpenForWrite
-			jsr	WriteLeader
-			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
-
+			jmp	WriteLeader
+;			jsr	WriteLeader
+;			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
+		.)
 
 		;---------------------------------------------------------------------------
 		; 29 Octets
@@ -347,15 +416,16 @@ RESET_VECTOR    = $fffc
 			lda	#$01
 			ldy	#$00
 			jsr	SetByteWrite
-			bne	fin_erreur			; TODO: /!\ Test par rapport à INT_DISK_READ mais SetByteWrite renvoie INT_SUCCESS (au moins avec Oricutron, à vérifier en réel)
+			cmp	#INT_DISK_WRITE			; /!\ Test par rapport à INT_SUCCESS mais SetByteWrite renvoie INT_DISK_WRITE si on écrit un seul octet
+			bne	fin_erreur
 
                         lda     #CH376_CMD_WR_REQ_DATA		; WriteRqData
                         sta     CH376_COMMAND
 			lda	CH376_DATA			; Nombre de caractère à écrire
-                        lda     $2f
-                        sta     CH376_DATA			; Caractère écrit
+                        lda     $2f				; Caractère à écrire
+                        sta     CH376_DATA
 			jsr     ByteWrGo			; Nécessaire en réel, sinon le CH376 boucle sur son buffer
-			clc					; Indique pas d'erreur de lecture
+			clc					; Indique pas d'erreur d'écriture
 			.byte $24
 		fin_erreur:
 			sec
@@ -363,28 +433,29 @@ RESET_VECTOR    = $fffc
 		.)
 
 #if 0
-; 38 octets
+; 24 octets
 		-PutTapeData:
 		.(
 			jsr	SetByteReadWrite+2
 			bne	_PutTapeData_error
 
-			lda PROGSTART
-			ldy PROGSTART+1
-			sta INTTMP
-			sty INTTMP+1
+			; Inutile si on vient de PutTapeData+10
+			;lda PROGSTART
+			;ldy PROGSTART+1
+			;sta INTTMP
+			;sty INTTMP+1
 
-			; Boucle de chargement de la fonte (27 octets)
+			; Boucle de sauvegarde du bloc (18 octets)
 		loop:
-			; On peut supprimer les lda/ldy si on supprime les sta/sty de ReadUSBData
+			; On peut supprimer les lda/ldy si on supprime les sta/sty de WriteUSBData
 			;lda INTTMP
 			;ldy INTTMP+1
 			jsr WriteUSBData
 
 			;clc
 			;bcs WriteNextChunk
-			cpy #$00		; Nombre d'octets lus == 0?
-			beq fin
+			;cpy #$00		; Nombre d'octets écrits == 0?
+			;beq fin
 
 			; Ajuste le pointeur
 			clc
@@ -394,7 +465,7 @@ RESET_VECTOR    = $fffc
 			bcc *+4
 			inc INTTMP+1
 
-		ReadNextChunk:
+		WriteNextChunk:
 			jsr ByteWrGo
 			beq loop
 
@@ -406,7 +477,7 @@ RESET_VECTOR    = $fffc
 ; 22 octets
 		WriteUSBData:
 		.(
-			; On peut supprimer les sta/sty si on supprime les lda/ldy de load_data
+			; On peut supprimer les sta/sty si on supprime les lda/ldy de PutTapeData
 			; et que INTTMP est à jour avant l'appel
 		        ;sta INTTMP
 		        ;sty INTTMP+1
@@ -433,7 +504,7 @@ RESET_VECTOR    = $fffc
 #endif
 
 
-		; Inutile pour le moment
+		; 9 octets - Inutile pour le moment
 ;		WriteRqData:
 ;			lda	#CH376_CMD_WR_REQ_DATA	; WriteReqData
 ;			sta	CH376_COMMAND
@@ -517,7 +588,14 @@ RESET_VECTOR    = $fffc
 		;										; RETURN;
 		;	rts
 
-	; Actuellement: $E6AB
+	CloadMultiPart
+			jsr	MultiPart
+			jmp	GetTapeParams
+	RecallMultiPart
+			jsr	MultiPart
+			jmp	GetStoreRecallParams
+
+	; Actuellement: $E6C0 si MULTIPART_SAVE, $E6B6 sinon
 	LE6C9:
 ;#print *
 #if * > $e6c9
@@ -557,6 +635,7 @@ RESET_VECTOR    = $fffc
 		.)
 	LE76A:
 
+#ifndef MULTIPART_SAVE
 	;---------------------------------------------------------------------------
 	; Patche du CSAVE pour clore le fichier après la sauvegarde
 	;---------------------------------------------------------------------------
@@ -568,7 +647,7 @@ RESET_VECTOR    = $fffc
 	;---------------------------------------------------------------------------
 	new_patchl((STORE+69),3)
 		jsr WriteClose
-
+#endif
 
 	;---------------------------------------------------------------------------
 	; 10 Octets à l'emplacement de "MICROSOFT!"
@@ -581,7 +660,9 @@ RESET_VECTOR    = $fffc
 	MultiPart:
 			lda	#$01
 			sta	MULTIPFLAG
-			jmp	GetTapeParams
+			rts
+			nop
+			nop
 			nop
 			nop
 	LE43F:
@@ -595,7 +676,13 @@ RESET_VECTOR    = $fffc
 	; Patch la détection multipart de certains jeux qui ne passe pas par CLOAD
 	;---------------------------------------------------------------------------
 	new_patchl((CLOAD+1),3)
-		jsr MultiPart
+		jsr CloadMultiPart
+
+	;---------------------------------------------------------------------------
+	; Patch la détection multipart de certains jeux qui ne passe pas par RECALL
+	;---------------------------------------------------------------------------
+	new_patchl((RECALL+4),3)
+		jsr RecallMultiPart
 
 	;---------------------------------------------------------------------------
 	; Patch l'appel à SyncTape pour détecter l'appel direct
@@ -604,12 +691,23 @@ RESET_VECTOR    = $fffc
 		jsr SyncTape+3
 
 
+#ifdef FAST_LOAD
+		;---------------------------------------------------------------------------
+		; Pas de CLOAD "",V dans ce mode
+		;---------------------------------------------------------------------------
+	new_patchl(LE810,9)
+		.dsb 9, $ea
+
 	new_patch(GetTapeData,LE50A)
 		;---------------------------------------------------------------------------
-		; _GetTapeData (43 octets / 43 octets pour la version BASIC 1.1)
+		; GetTapeData (40 octets avec les nop / 43 octets pour la version BASIC 1.1)
 		;---------------------------------------------------------------------------
 		; Charge un programme en mémoire
-		; Doit être appelé APRES SetByteRead
+		;
+		; NOTE: - si ce patch est activé, la commande CLOAD "xxx",V est
+		;         désactivée et renverra "SYNTAX ERROR"
+		;
+		;       - Poopy copie cette routine en $A410 et la modifie
 		;
 		; Entree:
 		;	AY: Adresse de chargement
@@ -621,7 +719,8 @@ RESET_VECTOR    = $fffc
 		;	INTTMP: Pointeur adresse de chargement
 		;
 		; Utilise:
-		;	-
+		;	PROGSTART
+		;
 		; Sous-routines:
 		;	ReadUSBData
 		;	ByteRdGo
@@ -636,41 +735,42 @@ RESET_VECTOR    = $fffc
 			sta INTTMP
 			sty INTTMP+1
 
-			; Boucle de chargement de la fonte (27 octets)
+			; Boucle de chargement du fichier (25 octets avec les 3 nop)
 		loop:
-			; On peut supprimer les lda/ldy si on supprime les sta/sty de ReadUSBData
-			;lda INTTMP
-			;ldy INTTMP+1
 			jsr ReadUSBData
-
-			;clc
-			;bcs ReadNextChunk
-			cpy #$00		; Nombre d'octets lus == 0?
-			beq fin
+			bcs fin
 
 			; Ajuste le pointeur
-			clc
 			tya
+#ifdef GAMES
+			bne *+4				; Saute les 2 octets suivants
+			nop					; Poopy place $35 ici
+			nop					; Poopy place $A4 ici
+#endif
 			adc INTTMP
 			sta INTTMP
 			bcc *+4
 			inc INTTMP+1
 
-		ReadNextChunk:
 			jsr ByteRdGo
 			beq loop
 
 		fin:
 		_GetTapeData_error:
-			rts
+			rts					; Poopy place $60 ici :)
+#ifdef GAMES
+			nop					; Poopy place $A4 ici
+#endif
 		.)
 
-	; Actuellement: $E506
+	; Actuellement: $E503, $E508 si GAMES
 	LE50A:
 
 ;#print *
 #if * > $e50a
 #print "*** ERROR GetTapeData too long"
+#endif
+
 #endif
 
 	;---------------------------------------------------------------------------
@@ -725,7 +825,9 @@ RESET_VECTOR    = $fffc
 			;sty PTR_READ_DEST+1
 			lda	#CH376_CMD_SET_FILE_NAME
 			sta	CH376_COMMAND
+#ifdef FORCE_ROOT_DIR
 			sta	CH376_DATA		; Pour ouverture de '/'
+#endif
 			ldy	#$ff
 		ZZ0003:
 			iny
@@ -835,13 +937,15 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; Fermeture du fichier après sauvegarde
 		;---------------------------------------------------------------------------
+#ifndef MULTIPART_SAVE
 		WriteClose:
 			lda #$01			; Fermeture avec mise à jour
 			sta OPENFFLAG			; Indique fichier fermé
 			jsr FileClose
 			jmp LE93D
-
-	; Actuellement: $E72C
+#endif
+	; Actuellement: $E72C si not defined(MULTIPART_SAVE)
+	; Actuellement: $E721 si defined(MULTIPART_SAVE)
 	LE735:
 ;#print *
 #if * > $e735
@@ -934,9 +1038,9 @@ RESET_VECTOR    = $fffc
 		rts
 
 
-	new_patchl(CheckFoundName+5,22)
+	new_patchl(CheckFoundName+5,25)
 		;---------------------------------------------------------------------------
-		; ReadUSBData(22 octets)
+		; ReadUSBData(25 octets)
 		;---------------------------------------------------------------------------
 		; Charge un bloc en mémoire
 		;
@@ -944,6 +1048,7 @@ RESET_VECTOR    = $fffc
 		;	AY: Adresse de chargement
 		;
 		; Sortie:
+		;	C: 0->Ok, 1->aucun octet lu
 		;	A: Modifié
 		;	X: 0
 		;	Y: Nombre d'octets lus
@@ -977,12 +1082,14 @@ RESET_VECTOR    = $fffc
 		        iny
 		        dex
 		        bne ZZZ003
-
+                        clc
+                        .byte $24
 		ZZZ002:
+			sec
 		        rts
 		.)
 
-	; Actuellement: $E7AB
+	; Actuellement: $E7AE
 	LE7AF:
 ;#print *
 #if * > $e7af
@@ -1123,11 +1230,11 @@ RESET_VECTOR    = $fffc
 
 			; Adresse de fin
 			lda #<($b500+$300)
-			ldy #<($b500+$300)
+			ldy #>($b500+$300)
 			sta PROGEND
 			sty PROGEND+1
 
-			; Chargement du jeux de caractères
+			; Chargement du jeu de caractères
 			jsr GetTapeData
 
 		load_charset_error:
@@ -1165,7 +1272,11 @@ RESET_VECTOR    = $fffc
 		SetUSB:
 			lda	#CH376_CMD_SET_USB_MODE
 			sta	CH376_COMMAND
+#ifndef AUTO_USB_MODE
 			ldx	#CH376_USB_MODE
+#else
+			ldx	CH376_MODE
+#endif
 			stx	CH376_DATA
 
 			;Wait 10us
@@ -1286,7 +1397,7 @@ RESET_VECTOR    = $fffc
 
 
 		;---------------------------------------------------------------------------
-		; open_fqn (127 octets -3)
+		; open_fqn (107 octets -3)
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier (chemin absolu ou relatif sans ../)
 		; Les paramètres en entrée sont les mêmes que ceux en sortie de jsr CheckStr/ReleaseVarStr
@@ -1350,23 +1461,30 @@ RESET_VECTOR    = $fffc
 										; CH376_DATA = .A;
 			sta CH376_DATA
 										; CH376_DATA = $00;
-			lda #$00
-			sta CH376_DATA
+;			lda #$00
+;			sta CH376_DATA
 										; CALL FileOpen; " Detruit X et Y";
-			jsr FileOpen
+;			jsr FileOpen
+; Optimisation taille: Gain 5 Octets
+			jsr ZZ0006
 										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
 			cmp #ERR_OPEN_DIR
 			bne CD_End
 										; INC PTR1+3;
 			inc INTTMP+1
 										; END;
-										; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFiPTR1+2ame";
+										; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFilename";
 		ZZ1003:
-			lda INTTMP
-			cmp INTTMP+1
-			beq  *+4
-			bcs  *+5
-			jmp ZZ1004
+;			lda INTTMP
+;			cmp INTTMP+1
+;			beq  *+4
+;			bcs  *+5
+;			jmp ZZ1004
+; Optimisation en inversant le test: Gain 5 Octets
+			lda INTTMP+1
+			cmp INTTMP
+			bcs ZZ0006
+
 			lda #$2F
 			sta CH376_COMMAND
 		ZZ1004:
@@ -1393,21 +1511,28 @@ RESET_VECTOR    = $fffc
 			bne ZZ0007
 										; BEGIN;
 										; CH376_DATA = 0;
-			lda #$00
-			sta CH376_DATA
+;			lda #$00
+;			sta CH376_DATA
 										; CALL FileOpen;
-			jsr FileOpen
+;			jsr FileOpen
+; Optimisation taille: Gain 5 Octets
+			jsr ZZ0006
 										; IFF .A ^= #ERR_OPEN_DIR THEN CD_End;
 			cmp #ERR_OPEN_DIR
 			bne CD_End
 										; INC PTR1+3;
 			inc INTTMP+1
 											; IF PTR1+3 < PTR1+2 THEN CH376_COMMAND = $2F; " SetFiPTR1+2ame";
-			lda INTTMP
-			cmp INTTMP+1
-			beq  *+4
-			bcs  *+5
-			jmp ZZ0008
+;			lda INTTMP
+;			cmp INTTMP+1
+;			beq  *+4
+;			bcs  *+5
+;			jmp ZZ0008
+; Optimisation en inversant le test: Gain 5 Octets
+			lda INTTMP+1
+			cmp INTTMP
+			bcs ZZ0008
+
 			lda #$2F
 			sta CH376_COMMAND
 		ZZ0008:
@@ -1423,6 +1548,7 @@ RESET_VECTOR    = $fffc
 			inc INTTMP+1
 										; END;
 			jmp ZZ1005
+
 		ZZ0006:
 										; CH376_DATA = $00;
 			lda #$00
@@ -1545,7 +1671,11 @@ RESET_VECTOR    = $fffc
 		SetUSB:
 			lda	#CH376_CMD_SET_USB_MODE
 			sta	CH376_COMMAND
+#ifndef AUTO_USB_MODE
 			ldx	#CH376_USB_MODE
+#else
+			ldx	CH376_MODE
+#endif
 			stx	CH376_DATA
 
 			;Wait 10us
@@ -1572,21 +1702,28 @@ RESET_VECTOR    = $fffc
 ; [---
 #ifdef HOBBIT
 	new_patchl($fcb8, 29)
+;	new_patchl($fcb8, 20)
 #endif
 		;---------------------------------------------------------------------------
 		; ReadUSBData3 (29 octets)
 		;---------------------------------------------------------------------------
 		; Lit un caractère depuis la K7
 		;
+		; Note: Optimisation impossible pour Hobbit qui utilise INTTMP pendant le
+		;       chargement (Lone Raider aussi).
+		;
 		; Entree:
 		;	-
 		;
 		; Sortie:
+		;	C: 0->Ok, 1-> Erreur
 		;	A: Caractère lu
+		;	X: 0
+		;	Y: 1
 		;	$2f: Caractère lu
 		;
 		; Modifie:
-		;	$2f: Caractère lu
+		;	INTTMP: valeur: $002f
 		;
 		; Utilise:
 		;	-
@@ -1599,9 +1736,10 @@ RESET_VECTOR    = $fffc
 			; On lit 1 caractère
 			lda	#$01
 			ldy	#$00
+;			sty	INTTMP+1
 			jsr	SetByteRead
 			bne	fin_erreur
-
+#if 1
                         lda     #CH376_CMD_RD_USB_DATA0
                         sta     CH376_COMMAND
 			lda	CH376_DATA			; Nombre de caractère à lire
@@ -1610,6 +1748,11 @@ RESET_VECTOR    = $fffc
 			jsr     ByteRdGo			; Nécessaire en réel, sinon le CH376 boucle sur son buffer
 			clc					; Indique pas d'erreur de lecture
 			.byte $24
+#else
+			lda	#$2f				; On veut le caractère lu dans $2F
+			sta	INTTMP
+			jmp	ReadUSBData
+#endif
 		fin_erreur:
 			sec
                         rts
@@ -1653,7 +1796,7 @@ RESET_VECTOR    = $fffc
 		; (24 octets)
 		;---------------------------------------------------------------------------
 		;
-		; Efface la ligne de status + 'OUT OF DATA ERROR'
+		; Efface la ligne de status + 'FILE NOT FOUND ERROR'
 		; Utilisé pour indiquer une erreur lors de la lecure d'un fichier
 		;---------------------------------------------------------------------------
 		; $fda7: 'F' -> 'H'
@@ -1683,6 +1826,11 @@ RESET_VECTOR    = $fffc
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier en lecture
 		;
+		; TODO: A voir si il faut conserver tous les tests pour la version "normale"
+		;        de la rom basic11 ou si il ne faut conserver que le premier test
+		;        et faire du #ifdef HOBBIT le cas général et la partie #else le cas
+		;        pour la version GAMES
+		;
 		; Entree:
 		;	-
 		;
@@ -1709,6 +1857,14 @@ RESET_VECTOR    = $fffc
 			jsr CloseOpenedFile
 			lda #$00
 #else
+
+#ifdef GAMES
+			; Le jeu "Them" utilise un CLOAD " " pour charger le second module
+			; => si le premier caractère du nom du fichier est ' ' on suupose du multipart
+			; /!\ On ne teste que le premier caractère
+			cmp #' '
+			beq fin
+#endif
 			; Test pour Hellion, Frelon, Psy...
 			; Ces jeux chargent le second programme en faisant
 			; un appel direct en $E867 (Atmos)
@@ -1720,7 +1876,7 @@ RESET_VECTOR    = $fffc
 ;			bit TAPE_SPEED
 ;			bvc *+6
 ;			lda #$00
-			lda MULTIPFLAG			; Si on n'est pas passé par GetTapeParams => fin (multipart, appel direct aux reoutines de la ROM)
+			lda MULTIPFLAG			; Si on n'est pas passé par GetTapeParams => fin (multipart, appel direct aux routines de la ROM)
 			beq fin
 			jsr CloseOpenedFile
 			;jsr SetFilename2
@@ -2063,6 +2219,16 @@ CharSet_end:
 
 
 ;---------------------------------------------------------------------------
+;			Modifications ROM 1.22
+;---------------------------------------------------------------------------
+#ifdef ROM_122
+	;---------------------------------------------------------------------------
+	; Correction bug IF/THEN/ELSE
+	;---------------------------------------------------------------------------
+		new_patchl($c93c,3)
+				jsr	REM
+#endif
+;---------------------------------------------------------------------------
 ;			Modifications pour Orix
 ;---------------------------------------------------------------------------
 
@@ -2072,11 +2238,6 @@ CharSet_end:
 	;
 	; /!\ ATTENTION: Frelon, Hellion, Harrier,... testent $fff9 pour savoir si il s'agit
 	;                d'un Atmos ($01) ou non
-	;                Pour compatibilité avec ces jeux, adresses possibles
-	;                de Copyright: $FD01 ('1'), $FE01 ('Q')ou $FF01 ('q') dans le
-	;                jeu de caractères.
-	;                Dans ce cas, la zone $ED96-$EDC3 est disponible (ancien message)
-	;                il faut en outre modifier les instructions en $ED38 et $ED3A
 	;---------------------------------------------------------------------------
 #ifdef ORIX_SIGNATURE
 		new_patchl($fff8,2)
