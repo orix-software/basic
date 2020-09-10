@@ -112,7 +112,7 @@ for i in range(len(datastore)):
             #    zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
             print("tap")
-            filenametap=tail.lower()replace(" ", "")
+            filenametap=tail.lower().replace(" ", "")
             print(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap)
             copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap )
             if not os.path.exists(destetc+"/"+letter):
