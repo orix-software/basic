@@ -23,6 +23,10 @@ if not os.path.exists(dest):
     pathlib.Path(dest).mkdir(parents=True)
 if not os.path.exists(destetc):
     pathlib.Path(destetc).mkdir(parents=True)    
+if not os.path.exists(tmpfolderRetrieveSoftware):
+    pathlib.Path(tmpfolderRetrieveSoftware).mkdir(parents=True)    
+
+
 
 
 print("Retrieve json file from oric.org ...")
