@@ -31,8 +31,9 @@ script:
 
 after_success:
     - VERSION=`cat VERSION`
+    - python -V
     - cd tools && python retrieveSoftwareOricOrg.py && cd ..
-    - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basic???.rom orix/usr/share/basic/$VERSION/
+    - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basic*.rom orix/usr/share/basic/$VERSION/
     - mkdir -p orix/etc/orixcfg/$VERSION/ && echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
     - mkdir -p orix/usr/share/basic/0/
     - mkdir -p orix/usr/share/basic/1/
