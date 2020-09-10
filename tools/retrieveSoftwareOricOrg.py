@@ -7,13 +7,49 @@ import os, sys
 from io import BytesIO 
 import pathlib
 
+
 from shutil import copyfile
 
 def DecimalToBinary(num):
-    print("XXXXXXXXXXXXXXXXXXXXXX:"+num)
-    print("%d",int(num).to_bytes(1, byteorder='little'))
+    #print("XXXXXXXXXXXXXXXXXXXXXX:"+num)
+    #print("%d",int(num).to_bytes(1, byteorder='little'))
     return int(num).to_bytes(1, byteorder='little')
 
+def KeyboardMatrix(num):
+    #keyboardMatrixTab = [1.56, u"tabouret", 3j]
+    #keyboardMatrixTab[10]=180 #Down
+    #keyboardMatrixTab[32]=132 #Space
+    keyboardMatrixTab=[
+           #                                        LeftRight
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,172 ,188 , #0..9
+           #          RET 
+            180 ,156 ,175 ,0   ,0   ,0   ,0   ,0   ,0   ,0   , #10..19
+           #                                   ESC 
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,169 ,0   ,0   , #20..29
+           #          ESP
+            0   ,0   ,132 ,0   ,0   ,0   ,0   ,0   ,0   ,0   , #30..39
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   , #40..49
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   , #50..59
+           #                         A    B    C    D    E
+            0   ,0   ,0   ,0   ,0   ,174 ,146 ,186 ,185 ,158  , #60..69
+           #F    G    H    I    J    K    L    M    N    O
+            153 ,150 ,142 ,141 ,129 ,131 ,143 ,130 ,136 ,149  , #70..79
+           #P    Q    R    S     T    U    V    W    X    Y 
+            157 ,177 ,145 ,182  ,137 ,133 ,152 ,180 ,176 ,134 , #80..89
+           #Z 
+            170 ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0    , #90..99
+
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #100..109
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #110..119
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #120..129
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #130..139
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #140..149
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #150..159
+
+
+            ] #Space
+    key=keyboardMatrixTab[int(num)]
+    return DecimalToBinary(key)
 
 dest="../orix/usr/share/basic11"
 destetc="../orix/var/cache/basic11/"
@@ -25,9 +61,6 @@ if not os.path.exists(destetc):
     pathlib.Path(destetc).mkdir(parents=True)    
 if not os.path.exists(tmpfolderRetrieveSoftware):
     pathlib.Path(tmpfolderRetrieveSoftware).mkdir(parents=True)    
-
-
-
 
 print("Retrieve json file from oric.org ...")
 b_obj = BytesIO() 
@@ -126,12 +159,12 @@ for i in range(len(datastore)):
 
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
             f.write(DecimalToBinary(rombasic11))
-            f.write(DecimalToBinary(down_joy))
-            f.write(DecimalToBinary(right_joy))
-            f.write(DecimalToBinary(left_joy))
-            f.write(DecimalToBinary(fire1_joy))
-            f.write(DecimalToBinary(up_joy))
-            f.write(DecimalToBinary(fire2_joy))
+            f.write(KeyboardMatrix(down_joy))
+            f.write(KeyboardMatrix(right_joy))
+            f.write(KeyboardMatrix(left_joy))
+            f.write(KeyboardMatrix(fire1_joy))
+            f.write(KeyboardMatrix(up_joy))
+            f.write(KeyboardMatrix(fire2_joy))
             f.close() 
 
         exit
