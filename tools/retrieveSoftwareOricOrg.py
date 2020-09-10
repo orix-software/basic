@@ -112,21 +112,22 @@ for i in range(len(datastore)):
             #    zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
             print("tap")
-            print(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+tail.lower())
-            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+tail.lower() )
-        if not os.path.exists(destetc+"/"+letter):
-            os.mkdir(destetc+"/"+letter)
-        tcnf=tail.lower().split('.')
-        cnf=tcnf[0]+".db"
+            filenametap=tail.lower()replace(" ", "")
+            print(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap)
+            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap )
+            if not os.path.exists(destetc+"/"+letter):
+                os.mkdir(destetc+"/"+letter)
+            tcnf=filenametap.split('.')
+            cnf=tcnf[0]+".db"
 
-        f = open(destetc+"/"+letter+"/"+cnf, "wb")
-        f.write(DecimalToBinary(rombasic11))
-        f.write(DecimalToBinary(down_joy))
-        f.write(DecimalToBinary(right_joy))
-        f.write(DecimalToBinary(left_joy))
-        f.write(DecimalToBinary(fire1_joy))
-        f.write(DecimalToBinary(up_joy))
-        f.write(DecimalToBinary(fire2_joy))
-        f.close() 
+            f = open(destetc+"/"+letter+"/"+cnf, "wb")
+            f.write(DecimalToBinary(rombasic11))
+            f.write(DecimalToBinary(down_joy))
+            f.write(DecimalToBinary(right_joy))
+            f.write(DecimalToBinary(left_joy))
+            f.write(DecimalToBinary(fire1_joy))
+            f.write(DecimalToBinary(up_joy))
+            f.write(DecimalToBinary(fire2_joy))
+            f.close() 
 
         exit

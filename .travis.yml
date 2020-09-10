@@ -9,7 +9,7 @@ addons:
                         - curl
 
 install:
-    # - sudo apt-get update -qq
+    - sudo apt-get update -qq
     # - sudo apt-get install -qq curl
     # - sudo apt-get install -qq git
     # - sudo pip install --upgrade pip
@@ -17,6 +17,9 @@ install:
     # - git clone https://github.com/oric-software/buildTestAndRelease.git
     # - cd buildTestAndRelease/ && sh make.sh
     #- pushd ..
+    - sudo pip install --upgrade pip
+    - pip install pathlib
+    - pip install pycurl    
     - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
     - pushd xa65/xa && make &> /dev/null
     - cp file65 ldo65 reloc65 xa /home/travis/bin
@@ -31,6 +34,9 @@ after_success:
     - cd tools && python retrieveSoftwareOrg.py && cd ..
     - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basic???.rom orix/usr/share/basic/$VERSION/
     - mkdir -p orix/etc/orixcfg/$VERSION/ && echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
+    - mkdir -p orix/usr/share/basic/0/
+    - mkdir -p orix/usr/share/basic/1/
+    - mkdir -p orix/usr/share/basic/2/    
     - echo "Basicsd Games v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
