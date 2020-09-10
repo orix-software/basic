@@ -15,8 +15,8 @@ def DecimalToBinary(num):
     return int(num).to_bytes(1, byteorder='little')
 
 
-dest="../build/usr/share/basic11"
-destetc="../build/var/cache/basic11/"
+dest="../orix/usr/share/basic11"
+destetc="../orix/var/cache/basic11/"
 tmpfolderRetrieveSoftware="build/"
 exist_ok=True
 if not os.path.exists(dest):
