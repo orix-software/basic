@@ -35,7 +35,7 @@ def KeyboardMatrix(num):
            #F    G    H    I    J    K    L    M    N    O
             153 ,150 ,142 ,141 ,129 ,131 ,143 ,130 ,136 ,149  , #70..79
            #P    Q    R    S     T    U    V    W    X    Y 
-            157 ,177 ,145 ,182  ,137 ,133 ,152 ,180 ,176 ,134 , #80..89
+            157 ,177 ,145 ,182 ,137 ,133 ,152 ,180 ,176 ,134 , #80..89
            #Z 
             170 ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0    , #90..99
 
@@ -47,7 +47,7 @@ def KeyboardMatrix(num):
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #150..159
 
 
-            ] #Space
+            ] 
     key=keyboardMatrixTab[int(num)]
     return DecimalToBinary(key)
 
@@ -122,7 +122,7 @@ for i in range(len(datastore)):
         # Decode the bytes stored in get_body to HTML and print the result 
         #print('Output of GET request:\n%s' % get_body.decode('utf8')) 
 
-        extension=tapefile[-3:]
+        extension=tapefile[-3:].lower()
 
 
         head, tail = os.path.split(tapefile)
@@ -134,7 +134,7 @@ for i in range(len(datastore)):
         letter=tail[0:1].lower()
         folder=dest+'/'+letter
         folderdb=destetc+'/'+letter
-        print(folder)
+        #print(folder)
         directory = os.path.dirname(folder)
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -149,13 +149,19 @@ for i in range(len(datastore)):
             #    zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
             print("tap")
-            filenametap=tail.lower().replace(" ", "")
-            print(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap)
-            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap )
+            filenametap=tail.lower().replace(" ", "").replace("-", "")
+            
+            tcnf=filenametap.split('.')
+            filenametapext=tcnf[1]
+            cnf=tcnf[0]+".db"
+            print("UIou"+tcnf[0])
+            filenametapbase=tcnf[0]
+            filenametap8bytesLength=filenametapbase[0:8]
+            print("Copy : "+tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext)
+            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext )
             if not os.path.exists(destetc+"/"+letter):
                 os.mkdir(destetc+"/"+letter)
-            tcnf=filenametap.split('.')
-            cnf=tcnf[0]+".db"
+     
 
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
             f.write(DecimalToBinary(rombasic11))
