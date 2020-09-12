@@ -93,11 +93,13 @@ for i in range(len(datastore)):
     name_software=datastore[i]["name_software"]
     name_software=name_software.replace("é", "e")
     name_software=name_software.replace("ç", "c")
+    name_software=name_software.replace("°", " ")
+    
     rombasic11=datastore[i]["basic11_ROM_TWILIGHTE"]
     up_joy=datastore[i]["up_joy"]
     down_joy=datastore[i]["down_joy"]
     right_joy=datastore[i]["right_joy"]
-    left_joy=datastore[i]["up_joy"]
+    left_joy=datastore[i]["left_joy"]
     fire1_joy=datastore[i]["fire1_joy"]
     fire2_joy=datastore[i]["fire2_joy"]
     fire3_joy=0
