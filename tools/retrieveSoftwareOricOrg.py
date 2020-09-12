@@ -31,7 +31,7 @@ def KeyboardMatrix(num):
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   , #40..49
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   , #50..59
            #                         A    B    C    D    E
-            0   ,0   ,0   ,0   ,0   ,174 ,146 ,186 ,185 ,158  , #60..69
+            140 ,0   ,148   ,0   ,0   ,174 ,146 ,186 ,185 ,158  , #60..69
            #F    G    H    I    J    K    L    M    N    O
             153 ,150 ,142 ,141 ,129 ,131 ,143 ,130 ,136 ,149  , #70..79
            #P    Q    R    S     T    U    V    W    X    Y 
@@ -90,13 +90,15 @@ for i in range(len(datastore)):
     print(i)
     #Use the new datastore datastructure
     tapefile=datastore[i]["download_software"]
+    name_software=datastore[i]["name_software"]
     rombasic11=datastore[i]["basic11_ROM_TWILIGHTE"]
     up_joy=datastore[i]["up_joy"]
     down_joy=datastore[i]["down_joy"]
     right_joy=datastore[i]["right_joy"]
     left_joy=datastore[i]["up_joy"]
     fire1_joy=datastore[i]["fire1_joy"]
-    fire2_joy=datastore[i]["fire2_joy"]    
+    fire2_joy=datastore[i]["fire2_joy"]
+    fire3_joy=0
     print(datastore[i])
     print(tapefile)
     if tapefile!="":
@@ -154,7 +156,6 @@ for i in range(len(datastore)):
             tcnf=filenametap.split('.')
             filenametapext=tcnf[1]
             cnf=tcnf[0]+".db"
-            print("UIou"+tcnf[0])
             filenametapbase=tcnf[0]
             filenametap8bytesLength=filenametapbase[0:8]
             print("Copy : "+tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext)
@@ -171,6 +172,12 @@ for i in range(len(datastore)):
             f.write(KeyboardMatrix(fire1_joy))
             f.write(KeyboardMatrix(up_joy))
             f.write(KeyboardMatrix(fire2_joy))
+            f.write(KeyboardMatrix(fire3_joy))
+            f.write(DecimalToBinary(len(name_software)))
+            name_software_bin=bytearray(name_software,'ascii')
+            name_software_bin.append(0x00)
+            f.write(name_software_bin)
+#            f.write('\0') # end of string
             f.close() 
 
         exit
