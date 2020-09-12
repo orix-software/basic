@@ -91,6 +91,8 @@ for i in range(len(datastore)):
     #Use the new datastore datastructure
     tapefile=datastore[i]["download_software"]
     name_software=datastore[i]["name_software"]
+    name_software=name_software.replace("é", "e")
+    name_software=name_software.replace("ç", "c")
     rombasic11=datastore[i]["basic11_ROM_TWILIGHTE"]
     up_joy=datastore[i]["up_joy"]
     down_joy=datastore[i]["down_joy"]
@@ -163,8 +165,9 @@ for i in range(len(datastore)):
             if not os.path.exists(destetc+"/"+letter):
                 os.mkdir(destetc+"/"+letter)
      
-
+            version_bin="0"
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
+            f.write(DecimalToBinary(version_bin))
             f.write(DecimalToBinary(rombasic11))
             f.write(KeyboardMatrix(down_joy))
             f.write(KeyboardMatrix(right_joy))
@@ -177,7 +180,7 @@ for i in range(len(datastore)):
             name_software_bin=bytearray(name_software,'ascii')
             name_software_bin.append(0x00)
             f.write(name_software_bin)
-#            f.write('\0') # end of string
+#            
             f.close() 
 
         exit
