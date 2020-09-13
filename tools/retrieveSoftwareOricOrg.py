@@ -10,15 +10,15 @@ import pathlib
 
 from shutil import copyfile
 
+version_bin="0"
+dest="../orix/usr/share/basic11"
+destetc="../orix/var/cache/basic11/"
+tmpfolderRetrieveSoftware="build/"
+
 def DecimalToBinary(num):
-    #print("XXXXXXXXXXXXXXXXXXXXXX:"+num)
-    #print("%d",int(num).to_bytes(1, byteorder='little'))
     return int(num).to_bytes(1, byteorder='little')
 
 def KeyboardMatrix(num):
-    #keyboardMatrixTab = [1.56, u"tabouret", 3j]
-    #keyboardMatrixTab[10]=180 #Down
-    #keyboardMatrixTab[32]=132 #Space
     keyboardMatrixTab=[
            #                                        LeftRight
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0   ,172 ,188 , #0..9
@@ -51,9 +51,7 @@ def KeyboardMatrix(num):
     key=keyboardMatrixTab[int(num)]
     return DecimalToBinary(key)
 
-dest="../orix/usr/share/basic11"
-destetc="../orix/var/cache/basic11/"
-tmpfolderRetrieveSoftware="build/"
+
 exist_ok=True
 if not os.path.exists(dest):
     pathlib.Path(dest).mkdir(parents=True)
@@ -67,7 +65,7 @@ b_obj = BytesIO()
 crl = pycurl.Curl() 
 
 # Set URL value
-crl.setopt(crl.URL, 'http://api.oric.org/0.2/softwares/')
+crl.setopt(crl.URL, 'http://api.oric.org/0.2/softwares/?sorts=name_software')
 
 # Write bytes that are utf-8 encoded
 crl.setopt(crl.WRITEDATA, b_obj)
@@ -86,12 +84,16 @@ get_body = b_obj.getvalue()
 
 datastore = json.loads(get_body.decode('utf8'))
 
+basic_main_db="basic11.db"
+basic_main_db_str=""
+
 for i in range(len(datastore)):
     print(i)
     #Use the new datastore datastructure
     tapefile=datastore[i]["download_software"]
     name_software=datastore[i]["name_software"]
     name_software=name_software.replace("é", "e")
+    name_software=name_software.replace("è", "e")
     name_software=name_software.replace("ç", "c")
     name_software=name_software.replace("°", " ")
     
@@ -110,7 +112,7 @@ for i in range(len(datastore)):
         crl_tape = pycurl.Curl() 
 
         # Set URL value
-        crl_tape.setopt(crl_tape.URL, 'https://cdn.oric.org//games/software/'+tapefile)
+        crl_tape.setopt(crl_tape.URL, 'https://cdn.oric.org/games/software/'+tapefile)
         crl_tape.setopt(crl_tape.SSL_VERIFYHOST, 0)
         crl_tape.setopt(crl_tape.SSL_VERIFYPEER, 0)
         # Write bytes that are utf-8 encoded
@@ -167,7 +169,7 @@ for i in range(len(datastore)):
             if not os.path.exists(destetc+"/"+letter):
                 os.mkdir(destetc+"/"+letter)
      
-            version_bin="0"
+
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
             f.write(DecimalToBinary(version_bin))
             f.write(DecimalToBinary(rombasic11))
@@ -184,5 +186,16 @@ for i in range(len(datastore)):
             f.write(name_software_bin)
 #            
             f.close() 
+            # main db
+            basic_main_db_str=basic_main_db_str+name_software+';'+filenametap8bytesLength+'\0'
 
-        exit
+        #exit
+f = open(destetc+"/"+basic_main_db, "wb")
+f.write(DecimalToBinary(version_bin))
+f.write(bytearray(basic_main_db_str,'ascii'))
+EOF=0xFF
+f.write(DecimalToBinary(EOF))
+#endof file : $FF
+
+f.close()            
+            
