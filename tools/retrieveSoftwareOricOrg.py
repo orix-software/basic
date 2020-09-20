@@ -96,6 +96,7 @@ for i in range(len(datastore)):
     name_software=name_software.replace("è", "e")
     name_software=name_software.replace("ç", "c")
     name_software=name_software.replace("°", " ")
+    name_software=name_software.replace("à", "a")
     
     rombasic11=datastore[i]["basic11_ROM_TWILIGHTE"]
     up_joy=datastore[i]["up_joy"]
