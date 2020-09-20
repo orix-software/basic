@@ -92,6 +92,9 @@ for i in range(len(datastore)):
     #Use the new datastore datastructure
     tapefile=datastore[i]["download_software"]
     name_software=datastore[i]["name_software"]
+    programmer_software=datastore[i]["programmer_software"]
+    platform_software=datastore[i]["platform_software"]
+    junk_software=datastore[i]["junk_software"]
     name_software=name_software.replace("é", "e")
     name_software=name_software.replace("è", "e")
     name_software=name_software.replace("ç", "c")
@@ -169,7 +172,12 @@ for i in range(len(datastore)):
             copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext )
             if not os.path.exists(destetc+"/"+letter):
                 os.mkdir(destetc+"/"+letter)
-     
+            md_software="# "+name_software+"\n"
+            md_software=md_software+"platform_software"+platform_software+"\n"
+            md_software=md_software+"Programmer: "+programmer_software+"\n"
+            md_software=md_software+"Informations: "+junk_software+"\n"
+            
+            
 
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
             f.write(DecimalToBinary(version_bin))
