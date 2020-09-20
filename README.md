@@ -39,13 +39,13 @@ BASIC cartridge for Orix with ch376 support
 ## Db Struct of a software (VERISON 1)
             version of db : 1 byte
             id of the rom : 1 byte
+            fire2_joy : 1 byte
+            fire3_joy : 1 byte            
             down_joy : 1 byte
             right_joy : 1 byte
             left_joy : 1 byte
             fire1_joy : 1 byte
             up_joy : 1 byte
-            fire2_joy : 1 byte
-            fire3_joy : 1 byte
             length of name_software = 1 byte length 
             name_software_bin = X bytes X equals to previous byte
             end of string : 1 bytes (value : 0)
