@@ -157,7 +157,7 @@ for i in range(len(datastore)):
             #    zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
             print("tap")
-            filenametap=tail.lower().replace(" ", "").replace("-", "")
+            filenametap=tail.lower().replace(" ", "").replace("-", "").replace("_", "")
             
             tcnf=filenametap.split('.')
             filenametapext=tcnf[1]
@@ -173,13 +173,14 @@ for i in range(len(datastore)):
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
             f.write(DecimalToBinary(version_bin))
             f.write(DecimalToBinary(rombasic11))
+            f.write(KeyboardMatrix(fire2_joy))
+            f.write(KeyboardMatrix(fire3_joy))            
             f.write(KeyboardMatrix(down_joy))
             f.write(KeyboardMatrix(right_joy))
             f.write(KeyboardMatrix(left_joy))
             f.write(KeyboardMatrix(fire1_joy))
             f.write(KeyboardMatrix(up_joy))
-            f.write(KeyboardMatrix(fire2_joy))
-            f.write(KeyboardMatrix(fire3_joy))
+
             f.write(DecimalToBinary(len(name_software)))
             name_software_bin=bytearray(name_software,'ascii')
             name_software_bin.append(0x00)
@@ -187,7 +188,7 @@ for i in range(len(datastore)):
 #            
             f.close() 
             # main db
-            basic_main_db_str=basic_main_db_str+name_software+';'+filenametap8bytesLength+'\0'
+            basic_main_db_str=basic_main_db_str+filenametap8bytesLength+';'+name_software+'\0'
 
         #exit
 f = open(destetc+"/"+basic_main_db, "wb")
