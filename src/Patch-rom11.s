@@ -115,8 +115,8 @@
 ;#define ROOT_DIR "/USR/SHARE/BASIC/"
 #define FAST_LOAD
 #define ROM_122
+#define JOYSTICK_DEFAULT_CONF
 #undef AUTO_USB_MODE
-
 #undef MULTIPART_SAVE
 
 
@@ -135,6 +135,7 @@
 	; Cyclotron modifie l'octet en $99, donc on doit forcer le mode du CH376
 ;#undef AUTO_USB_MODE
 
+#define JOYSTICK_EXTERNAL_CONF
 #endif
 
 	;---------------------------------------------------------------------------
@@ -142,6 +143,8 @@
 	;---------------------------------------------------------------------------
 #ifdef HOBBIT
 #undef JOYSTICK_DRIVER
+#undef JOYSTICK_DEFAULT_CONF
+#undef JOYSTICK_EXTERNAL_CONF
 #define FORCE_ROOT_DIR
 #undef ROOT_DIR
 ;#define ROOT_DIR "/USR/SHARE/GAMES/"
@@ -310,6 +313,10 @@ STORE           = $e987
 RECALL          = $e9d1
 LE93D           = $e93d
 CheckKbd        = $eb78
+
+#ifdef JOYSTICK_DEFAULT_CONF
+LEC9C           = $ec9c
+#endif
 
 StopTimer       = $ee1a
 
@@ -2393,6 +2400,42 @@ CharSet_end:
 	; Patch de la routine CheckKbd
 	new_patchl(ReadKbd+5,3)
 		jsr CheckJoystick
+
+#ifdef JOYSTICK_EXTERNAL_CONF
+#echo "Joystick driver: Keep external config (no RND init)"
+
+	; Permet de ne pas écraser une conf qui aurait été chargée avant le boot
+	; de la rom par la commande basic11 en ne copiant que CharGet en RAM
+	; /!\ Avec ce patch, la valeur initiale de RND n'est pas copiée en RAM
+	;
+	; Valeur initiale de RND: 0.811635171
+	;.byte   $80                             ; ECB4 80
+	;.byte   $4F                             ; ECB5 4F
+	;.byte   $C7                             ; ECB6 C7
+	;.byte   $52                             ; ECB7 52
+	;.byte   $58                             ; ECB8 58 (non copié par ColdStart)
+
+	new_patchl(StartBASIC+45,2)
+		ldx #$11
+
+#endif
+
+#ifdef JOYSTICK_DEFAULT_CONF
+#echo "Joystick driver: Add default configuration"
+
+	; Ajoute une configuration par défaut
+	; Copiée automatiquement au démarrage par la Coldstart en $ECFB
+	; qui copie Charget et RND en RAM
+	new_patchl(LEC9C+17,7)
+		.byte $AF	; Fire 2 => [Enter]
+		.byte $A9	; Fire 3 => [Esc]
+		.byte $B4	; Down   => [Down_arrow]
+		.byte $BC	; Right  => [Right_arrow]
+		.byte $AC	; Left   => [Left_arrow]
+		.byte $84	; Fire   => [Space]
+		.byte $9C	; Up     => [Up_arrow]
+#endif
+
 #endif
 
 ;---------------------------------------------------------------------------
