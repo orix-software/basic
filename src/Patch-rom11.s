@@ -111,8 +111,8 @@
 #define ORIX_CLI
 #define LOAD_CHARSET
 #define ORIX_SIGNATURE
-#undef FORCE_ROOT_DIR
-#define ROOT_DIR "/USR/SHARE/BASIC/"
+#define FORCE_ROOT_DIR
+;#define ROOT_DIR "/USR/SHARE/BASIC/"
 #define FAST_LOAD
 #define ROM_122
 #undef AUTO_USB_MODE
@@ -126,8 +126,8 @@
 #ifdef GAMES
 #undef HOBBIT
 #undef ORIX_SIGNATURE
-#undef FORCE_ROOT_DIR
-#define ROOT_DIR "/USR/SHARE/GAMES/"
+;#define FORCE_ROOT_DIR
+;#define ROOT_DIR "/USR/SHARE/GAMES/"
 #undef EXPERIMENTAL
 #undef ROM_122
 #undef MULTIPART_SAVE
@@ -205,7 +205,7 @@ CH376_MODE	= $99			; Mis à jour par Orix lors de l'appel
 HIMEM_PTR       = $a6
 
 TXTPTR          = $e9
-JOY_TBL         = $f5
+JOY_TBL         = $f3
 
 ;---------------------------------------------------------------------------
 ;
@@ -595,7 +595,12 @@ RESET_VECTOR    = $fffc
 			jsr	MultiPart
 			jmp	GetStoreRecallParams
 
-	; Actuellement: $E6C0 si MULTIPART_SAVE, $E6B6 sinon
+#ifndef FORCE_ROOT_DIR
+	load_charset2:
+		jsr	load_charset
+		jmp	FileClose
+#endif
+	; Actuellement: $E6C6 si MULTIPART_SAVE, $E6BC sinon
 	LE6C9:
 ;#print *
 #if * > $e6c9
@@ -1990,7 +1995,26 @@ RESET_VECTOR    = $fffc
 		CheckJoystick:
 		.(
 			; Ne pas modifier A et X pour pouvoir appeler ReadKbdCol
-			ldy #$00		; Si on peut modifier Y
+
+			; Gestion des boutons 2 et 3
+			lda VIA2_IORA
+			rol
+			bcs B2
+			lda JOY_TBL
+			bcc MaJ_B2B3
+		B2:
+			rol
+			rol
+			bcs J1
+			lda JOY_TBL+1
+
+		MaJ_B2B3:
+			sta $0209
+
+			; Gestion du Joystick
+		J1:
+			php
+			ldy #$02		; Si on peut modifier Y
 			lda VIA2_IORB		; 35 Octets
 			and #$1f
 			lsr
@@ -2003,8 +2027,13 @@ RESET_VECTOR    = $fffc
 			bcc down
 			lsr
 			bcc up
+
 		retour
+			plp
+			;bcc autre_direction
+			;bcc fin
 			lda $0208		; Instruction supprimée de ReadKbd
+			bcc repetition
 			rts			; Retour à ReadKbd
 
 		up
@@ -2016,6 +2045,7 @@ RESET_VECTOR    = $fffc
 		right
 			iny
 		down
+			plp
 			lda JOY_TBL,y		; La table doit contenir le code de la touche
 			; Tester si il s'agit de la même direction
 			; Si oui -> rts possible
@@ -2025,6 +2055,7 @@ RESET_VECTOR    = $fffc
 			;ora $80		; b7=1 pour indiquer qu'une touche est appuyée
 			cmp $0208
 			bne autre_direction
+		repetition
 			tay
 			pla			; Oublie l'adresse de retour
 			pla
@@ -2052,7 +2083,7 @@ RESET_VECTOR    = $fffc
 
 			lda $024e		; Initialise le compteur pour la répétition
 			sta $020e
-
+		;fin:
 			pla			; Oublie l'adresse de retour
 			pla
 
@@ -2350,7 +2381,12 @@ CharSet_end:
 	; On suppose que l'Oric a déjà démarré et que le jeu est en place
 	; Charge un jeu decaractères depuis la carte SD/USB
 	new_patchl(LF8B8+26,3)
+#ifdef FORCE_ROOT_DIR
 	jsr load_charset
+#else
+	jsr load_charset2
+#endif
+
 #endif
 
 ;---------------------------------------------------------------------------
