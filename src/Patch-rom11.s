@@ -1369,20 +1369,29 @@ RESET_VECTOR    = $fffc
 ;								Total: 264
 ;
 ; Joystick:
+;	Fire2:	$f3
+;	Fire3:	$f4
 ;	Down:	$f5
 ;	Right:	$f6
 ;	Left:	$f7
 ;	Fire:	$f8
-;	UP:	$f9
+;	Up:	$f9
 ;
 ; Touches:
-;	[SPACE]: $84
-;	[ENTER]: $AF
-;	[DOWN]:  $B4
-;	[RIGHT]: $BC
-;	[LEFT]: $AC
-;	[UP]  : $9C
+;	[ESC]	$A9
+;	[SPACE]	$84
+;	[ENTER]	$AF
+;	[DOWN] 	$B4
+;	[RIGHT]	$BC
+;	[LEFT]	$AC
+;	[UP]	$9C
 ;
+; Spéciales:
+;	[SHIFT_L]	$A4
+;	[SHIFT_R]	$A7
+;	[CTRL_L]	$A2
+;	[CTRL_R]	$A0	/!\ Spécifique Oricutron
+;	[FUNCT]		$A5
 
 
 		; Spécial pour The Hobbit qui vérifie la valeur en $FC78
@@ -2001,19 +2010,39 @@ RESET_VECTOR    = $fffc
 			rol
 			bcs B2
 			lda JOY_TBL
-			bcc MaJ_B2B3
+			bcc Check_B2B3
 		B2:
 			rol
 			rol
 			bcs J1
 			lda JOY_TBL+1
 
-		MaJ_B2B3:
+		Check_B2B3:
+			bpl B2B3_invalid
+			; Touche spéciale? (Shift, Ctrl, Funct)
+			tay			; sauvegarde la touche pour plus tard
+			and #%00111000
+			cmp #%00100000
+		;	bne normal
+			beq special
+
+		normal
+			tya			; Restaure le code de la touche
+			bne repetition_test	; vers le cmp $0208
+
+
+		special
+			tya
 			sta $0209
+			clc			; Indique B2/B3 appuyé (on doit remettre C=0 à cause du cmp #%00100000 qui l'a mis à 1
+			bne J1			; Ou: BIT xx pour gagner un octet
+
+		B2B3_invalid
+			sec			; Indique B2/B3 non appuyé
 
 			; Gestion du Joystick
 		J1:
-			php
+			php			; C=0 indique l'appui sur B2 ou B3 (sauvegarde P pour plus tard)
 			ldy #$02		; Si on peut modifier Y
 			lda VIA2_IORB		; 35 Octets
 			and #$1f
@@ -2029,11 +2058,13 @@ RESET_VECTOR    = $fffc
 			bcc up
 
 		retour
-			plp
-			;bcc autre_direction
-			;bcc fin
+			plp			; Restaure P pour savoir si on a appuyé sur B2 ou B3 (touche spéciale)
 			lda $0208		; Instruction supprimée de ReadKbd
-			bcc repetition
+			; B2 ou B3 appuyé?
+			; Autorise combo <touche>+<B2/B3> en plus de <direction>+>B2/B3> et >B2/B3>+>direction> (<B2/B3>+>touche> => <touche> non pris en compte)
+			;bcc repetition
+			;bcc fin
+			bcc autre_direction
 			rts			; Retour à ReadKbd
 
 		up
@@ -2045,7 +2076,7 @@ RESET_VECTOR    = $fffc
 		right
 			iny
 		down
-			plp
+;			plp
 			lda JOY_TBL,y		; La table doit contenir le code de la touche
 			; Tester si il s'agit de la même direction
 			; Si oui -> rts possible
@@ -2053,8 +2084,12 @@ RESET_VECTOR    = $fffc
 			bpl retour		; Si la touche n'est pas définie, on repart vers ReadKbd
 			;beq retour		; Si la touche n'est pas définie, on repart vers ReadKbd
 			;ora $80		; b7=1 pour indiquer qu'une touche est appuyée
+			plp
+
+		repetition_test
 			cmp $0208
 			bne autre_direction
+
 		repetition
 			tay
 			pla			; Oublie l'adresse de retour
