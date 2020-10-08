@@ -11,7 +11,7 @@ import pathlib
 from shutil import copyfile
 
 version_bin="0"
-dest="../orix/usr/share/basic11"
+dest="../orix/home/basic11"
 destetc="../orix/var/cache/basic11/"
 tmpfolderRetrieveSoftware="build/"
 
@@ -45,6 +45,10 @@ def KeyboardMatrix(num):
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #130..139
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #140..149
             0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #150..159
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #160..169
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #170..179
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #180..189
+            0   ,0   ,0   ,0   ,0   ,0   ,0   ,0  ,0  , 0  , #190..199
 
 
             ] 
@@ -109,8 +113,8 @@ for i in range(len(datastore)):
     fire1_joy=datastore[i]["fire1_joy"]
     fire2_joy=datastore[i]["fire2_joy"]
     fire3_joy=0
-    print(datastore[i])
-    print(tapefile)
+    #print(datastore[i])
+    #print(tapefile)
     if tapefile!="":
         b_obj_tape = BytesIO() 
         crl_tape = pycurl.Curl() 
@@ -148,19 +152,20 @@ for i in range(len(datastore)):
         folderdb=destetc+'/'+letter
         #print(folder)
         directory = os.path.dirname(folder)
-        if not os.path.exists(folder):
-            os.mkdir(folder)
-            print("######################## Create "+folder)
+        #if not os.path.exists(folder):
+        #    os.mkdir(folder)
+        #    print("######################## Create "+folder)
         if not os.path.exists(folderdb):
             os.mkdir(folderdb)
             print("######################## Create "+folderdb)
 
         if extension=="zip":
             print("zip")
+            print(tail)
             #with zipfile.ZipFile(tmpfolderRetrieveSoftware+tail, 'r') as zip_ref:
             #    zip_ref.extractall(dest+"/"+rombasic11+"/"+letter+"")
         if extension=="tap":
-            print("tap")
+            #print("tap")
             filenametap=tail.lower().replace(" ", "").replace("-", "").replace("_", "")
             
             tcnf=filenametap.split('.')
@@ -168,8 +173,8 @@ for i in range(len(datastore)):
             cnf=tcnf[0]+".db"
             filenametapbase=tcnf[0]
             filenametap8bytesLength=filenametapbase[0:8]
-            print("Copy : "+tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext)
-            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext )
+            #print("Copy : "+tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext)
+            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+filenametap8bytesLength+"."+filenametapext )
             if not os.path.exists(destetc+"/"+letter):
                 os.mkdir(destetc+"/"+letter)
             md_software="# "+name_software+"\n"
