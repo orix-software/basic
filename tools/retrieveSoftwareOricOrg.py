@@ -6,14 +6,16 @@ import zipfile
 import os, sys
 from io import BytesIO 
 import pathlib
+import re
 
 
 from shutil import copyfile
 
 version_bin="0"
-dest="../orix/home/basic11"
+dest="../orix/usr/share/basic11/"
 destetc="../orix/var/cache/basic11/"
 tmpfolderRetrieveSoftware="build/"
+list_file_for_md2hlp=""
 
 def DecimalToBinary(num):
     return int(num).to_bytes(1, byteorder='little')
@@ -97,14 +99,37 @@ for i in range(len(datastore)):
     tapefile=datastore[i]["download_software"]
     name_software=datastore[i]["name_software"]
     programmer_software=datastore[i]["programmer_software"]
-    platform_software=datastore[i]["platform_software"]
+    download_platform_software=datastore[i]["platform_software"]
     junk_software=datastore[i]["junk_software"]
+    date_software=datastore[i]["date_software"]
     name_software=name_software.replace("é", "e")
     name_software=name_software.replace("è", "e")
     name_software=name_software.replace("ç", "c")
     name_software=name_software.replace("°", " ")
     name_software=name_software.replace("à", "a")
+    name_software=name_software.replace("â", "o")
+    joystick_management_state=datastore[i]["joystick_management_state"]
+
+    junk_software=junk_software.replace("é", "e")
+    junk_software=junk_software.replace("è", "e")
+    junk_software=junk_software.replace("ç", "c")
+    junk_software=junk_software.replace("°", " ")
+    junk_software=junk_software.replace("à", "a")
+    junk_software=junk_software.replace("ô", "o")
+    junk_software=junk_software.replace("ë", "e")
+    junk_software=junk_software.replace("ï", "i")
+    junk_software=junk_software.replace("©", "")
+    junk_software=junk_software.replace("â", "a")
     
+
+    programmer_software=programmer_software.replace("é", "e")
+    programmer_software=programmer_software.replace("è", "e")
+    programmer_software=programmer_software.replace("ç", "c")
+    programmer_software=programmer_software.replace("°", " ")
+    programmer_software=programmer_software.replace("à", "a")
+    programmer_software=programmer_software.replace("ô", "o")
+
+
     rombasic11=datastore[i]["basic11_ROM_TWILIGHTE"]
     up_joy=datastore[i]["up_joy"]
     down_joy=datastore[i]["down_joy"]
@@ -152,9 +177,9 @@ for i in range(len(datastore)):
         folderdb=destetc+'/'+letter
         #print(folder)
         directory = os.path.dirname(folder)
-        #if not os.path.exists(folder):
-        #    os.mkdir(folder)
-        #    print("######################## Create "+folder)
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+            print("######################## Create "+folder)
         if not os.path.exists(folderdb):
             os.mkdir(folderdb)
             print("######################## Create "+folderdb)
@@ -174,15 +199,43 @@ for i in range(len(datastore)):
             filenametapbase=tcnf[0]
             filenametap8bytesLength=filenametapbase[0:8]
             #print("Copy : "+tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext)
-            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+filenametap8bytesLength+"."+filenametapext )
+            copyfile(tmpfolderRetrieveSoftware+tail,dest+"/"+letter+"/"+filenametap8bytesLength+"."+filenametapext )
             if not os.path.exists(destetc+"/"+letter):
                 os.mkdir(destetc+"/"+letter)
             md_software="# "+name_software+"\n"
-            md_software=md_software+"platform_software"+platform_software+"\n"
-            md_software=md_software+"Programmer: "+programmer_software+"\n"
-            md_software=md_software+"Informations: "+junk_software+"\n"
+            #md_software=md_software+"Type : "+download_platform_software+"\n"
+            tdate_software=date_software.split('-')
+            year=tdate_software[0]
+            md_software=md_software+"Release Date : "+year+"\n"
+            md_software=md_software+"Platform : "
+            match = re.search('A', download_platform_software)
+            doslash="no"
+            if match:
+                md_software=md_software+"Atmos"
+                doslash="yes"
+            match = re.search('O', download_platform_software)
+            if match:
+                if doslash=="yes":
+                    md_software=md_software+"/"
+                md_software=md_software+"Oric-1"
+                doslash="yes"                
+
+            md_software=md_software+"\n"
             
+            md_software=md_software+"Programmer : "+programmer_software+"\n"
+            #md_software=md_software+"Origin : "+programmer_software+"\n"
+            md_software=md_software+"Informations : "+junk_software+"\n"
             
+            print(md_software)
+            
+            md=filenametap8bytesLength+".md"
+            file_md_path=dest+"/"+letter+"/"+md
+            f = open(file_md_path, "wb")
+            md_bin=bytearray(md_software,'ascii')
+            f.write(md_bin)
+            f.close()
+
+
 
             f = open(destetc+"/"+letter+"/"+cnf, "wb")
             f.write(DecimalToBinary(version_bin))
@@ -212,5 +265,4 @@ EOF=0xFF
 f.write(DecimalToBinary(EOF))
 #endof file : $FF
 
-f.close()            
-            
+

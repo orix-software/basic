@@ -23,12 +23,33 @@ BASIC cartridge for Orix with ch376 support
         Signature de la banque: KO
         Jeu de caractères interne détruit
         Chargement d'un fichier DEFAULT.CHS à la place du jeu de caractères de la ROM
+        pas d'initialisation de RND ni de la conf du joystick (doit être éventuellement fait par basic11)
     2: Normale:
         Joystick
         Signature de la banque: OK
         Jeu de caractère interne détruit
         Chargement d'un fichier DEFAULT.CHS à la place du jeu de caractères de la ROM
         Bug IF/THEN/ELSE corrigé
+         initialisation d'une configuration par défaut du joystick (et de RND)
+
+    Fire 2 (bit 7) => [Enter]
+    Fire 3 (bit 5) => [Esc]
+    Down   => [Down_arrow]
+    Right  => [Right_arrow]
+    Left   => [Left_arrow]
+    Fire   => [Space]
+    Up     => [Up_arrow]
+
+Joystick:
+
+    Boutons 2 & 3 pris en compte
+    Boutons 2 & 3 peuvent être affecté à une touche "normale" ou à une touche "spéciale"
+        [SHIFT_L] => $A4
+        [SHIFT_R] => $A7
+        [CTRL_L] => $A2
+        [CTRL_R] => $A0    /!\ Spécifique Oricutron
+        [FUNCT]  => $A5
+
 ## Joysticks offsets
     $f3: button 2
     $f4: button 3
