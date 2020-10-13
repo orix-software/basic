@@ -17,6 +17,27 @@ destetc="../orix/var/cache/basic11/"
 tmpfolderRetrieveSoftware="build/"
 list_file_for_md2hlp=""
 
+
+def removeFrenchChars(mystr):
+
+    
+    mystr=mystr.replace("é", "e")
+    mystr=mystr.replace("è", "e")
+    mystr=mystr.replace("ê", "e")
+    mystr=mystr.replace("ë", "e")
+    mystr=mystr.replace("ç", "c")
+    mystr=mystr.replace("°", " ")
+
+    mystr=mystr.replace("à", "a")
+    mystr=mystr.replace("â", "a")
+
+    mystr=mystr.replace("ô", "o")
+    mystr=mystr.replace("ï", "i")
+    mystr=mystr.replace("î", "i")
+    mystr=mystr.replace("©", "")
+    return mystr
+
+
 def DecimalToBinary(num):
     return int(num).to_bytes(1, byteorder='little')
 
@@ -109,17 +130,22 @@ for i in range(len(datastore)):
     name_software=name_software.replace("à", "a")
     name_software=name_software.replace("â", "o")
     joystick_management_state=datastore[i]["joystick_management_state"]
+    junk_software=removeFrenchChars(junk_software)
+    #junk_software=junk_software.replace("é", "e")
+    #junk_software=junk_software.replace("è", "e")
+    #junk_software=junk_software.replace("ê", "e")
+    #junk_software=junk_software.replace("ë", "e")
+    #junk_software=junk_software.replace("ç", "c")
+    #junk_software=junk_software.replace("°", " ")
 
-    junk_software=junk_software.replace("é", "e")
-    junk_software=junk_software.replace("è", "e")
-    junk_software=junk_software.replace("ç", "c")
-    junk_software=junk_software.replace("°", " ")
-    junk_software=junk_software.replace("à", "a")
-    junk_software=junk_software.replace("ô", "o")
-    junk_software=junk_software.replace("ë", "e")
-    junk_software=junk_software.replace("ï", "i")
-    junk_software=junk_software.replace("©", "")
-    junk_software=junk_software.replace("â", "a")
+    #junk_software=junk_software.replace("à", "a")
+    #junk_software=junk_software.replace("â", "a")
+
+    #junk_software=junk_software.replace("ô", "o")
+    #junk_software=junk_software.replace("ï", "i")
+    #junk_software=junk_software.replace("î", "i")
+    #junk_software=junk_software.replace("©", "")
+    
     
 
     programmer_software=programmer_software.replace("é", "e")
