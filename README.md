@@ -18,6 +18,7 @@ BASIC cartridge for Orix with ch376 support
         Signature de la banque: Ok
         Jeu de caractères interne partiellement conservé
         Pas de chargement d'un fichier de xxx.CHS
+        doit être à la racine du device (sdcard ou clé usb)
     1: Jeux:
         Joysticks
         Signature de la banque: KO
