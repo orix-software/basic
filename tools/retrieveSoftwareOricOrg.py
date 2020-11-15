@@ -112,7 +112,12 @@ get_body = b_obj.getvalue()
 datastore = json.loads(get_body.decode('utf8'))
 
 basic_main_db="basic11.db"
+basic_main_db_indexed="basic11i.db"
 basic_main_db_str=""
+count=0
+#                       low, high
+main_db_table_software=[1,0]
+lenAddSoftware=0
 
 for i in range(len(datastore)):
     print(i)
@@ -238,7 +243,7 @@ for i in range(len(datastore)):
             #md_software=md_software+"Origin : "+programmer_software+"\n"
             md_software=md_software+"Informations : "+junk_software+"\n"
             
-            print(md_software)
+            #print(md_software)
             
             md=filenametap8bytesLength+".md"
             file_md_path=dest+"/"+letter+"/"+md
@@ -249,7 +254,7 @@ for i in range(len(datastore)):
 
 
 
-            f = open(destetc+"/"+letter+"/"+cnf, "wb")
+            f = open(destetc+"/"+letter+"/"+filenametap8bytesLength+".db", "wb")
             f.write(DecimalToBinary(version_bin))
             f.write(DecimalToBinary(rombasic11))
             f.write(KeyboardMatrix(fire2_joy))
@@ -265,9 +270,17 @@ for i in range(len(datastore)):
             name_software_bin.append(0x00)
             f.write(name_software_bin)
 #            
-            f.close() 
+            f.close()
+            count=count+1
+
             # main db
-            basic_main_db_str=basic_main_db_str+filenametap8bytesLength+';'+name_software+'\0'
+            print(name_software)
+            addSoftware=filenametap8bytesLength+';'+name_software+'\0'
+            basic_main_db_str=basic_main_db_str+addSoftware
+            lenAddSoftware+=len(addSoftware)
+            
+            #listeconcat.append(3j)
+            main_db_table_software.append(lenAddSoftware.to_bytes(2, 'little'))
 
         #exit
 f = open(destetc+"/"+basic_main_db, "wb")
@@ -275,6 +288,22 @@ f.write(DecimalToBinary(version_bin))
 f.write(bytearray(basic_main_db_str,'ascii'))
 EOF=0xFF
 f.write(DecimalToBinary(EOF))
+f.close()
+EOF=0xFF
+print(main_db_table_software)
+# indexed
+f = open(destetc+"/"+basic_main_db_indexed, "wb")
+f.write(DecimalToBinary(version_bin))
+f.write(bytearray(basic_main_db_str,'ascii'))
+
+#f.write(DecimalToBinary(EOF))
+##for item in main_db_table_software:
+    #f.write(item)
+
+f.write(DecimalToBinary(EOF))
+
+#print("Number of software : "+count)
+
 #endof file : $FF
 
 
