@@ -10,9 +10,9 @@ addons:
                         - python3
 
 install:
-    - sudo pip install --upgrade pip
-    - pip install pathlib
-    - pip install pycurl    
+    - sudo pip3 install --upgrade pip3
+    - pip3 install pathlib
+    - pip3 install pycurl
     - pushd tools && git clone https://github.com/assinie/md2hlp.git
     - popd
     - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
@@ -35,8 +35,5 @@ after_success:
     - echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicusb Games v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-    - mkdir -p orix/usr/share/basic/0/
-    - mkdir -p orix/usr/share/basic/1/
-    - mkdir -p orix/usr/share/basic/2/    
     - tar -zcvf ../basic.tgz -C orix *
     - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
