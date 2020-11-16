@@ -197,6 +197,7 @@ help:
 
 
 configure:
+	@echo
 	@mkdir -p $(BUILDPATH)
 ifeq ($(OSDK_FOUND),)
 	@echo "Using official xa"

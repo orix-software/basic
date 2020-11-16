@@ -112,13 +112,20 @@
 #define LOAD_CHARSET
 #define ORIX_SIGNATURE
 #define FORCE_ROOT_DIR
-;#define ROOT_DIR "/USR/SHARE/BASIC/"
+#define ROOT_DIR "/HOME/BASIC11"
+;#define ROOT_DIR "/"
 #define FAST_LOAD
 #define ROM_122
 #define JOYSTICK_DEFAULT_CONF
 #undef AUTO_USB_MODE
 #undef MULTIPART_SAVE
 
+#define SET_CHROOT
+
+; Si la carte contient un vrai 6522
+;#define VIA2_6522
+; Si la carte contient juste le  minimum
+#define VIA2_FAKE
 
 	;---------------------------------------------------------------------------
 	;			Configuration "Games"
@@ -127,7 +134,9 @@
 #undef HOBBIT
 #undef ORIX_SIGNATURE
 ;#define FORCE_ROOT_DIR
-;#define ROOT_DIR "/USR/SHARE/GAMES/"
+;#define ROOT_DIR "/USR/SHARE/GAMES"
+#define ROOT_DIR "/USR/SHARE/BASIC11"
+#define FAST_LOAD
 #undef EXPERIMENTAL
 #undef ROM_122
 #undef MULTIPART_SAVE
@@ -136,6 +145,7 @@
 ;#undef AUTO_USB_MODE
 
 #define JOYSTICK_EXTERNAL_CONF
+
 #endif
 
 	;---------------------------------------------------------------------------
@@ -152,6 +162,8 @@
 #undef LOAD_CHARSET
 #undef ROM_122
 #undef MULTIPART_SAVE
+
+#undef SET_CHROOT
 #endif
 
 	;---------------------------------------------------------------------------
@@ -167,6 +179,12 @@
 	;---------------------------------------------------------------------------
 #ifdef EXPERIMENTAL
 #define ADD_DEF_CHAR
+#define ADD_ERROR
+
+#ifdef ROM_122
+#define ADD_ONERROR
+#endif
+
 #endif
 
 	;---------------------------------------------------------------------------
@@ -183,6 +201,25 @@
 #endif
 #echo "Default charset:" DEFAULT_CHARSET
 #endif
+#endif
+
+	;---------------------------------------------------------------------------
+	;			Gestion CHROOT
+	;---------------------------------------------------------------------------
+#ifdef SET_CHROOT
+#undef FORCE_ROOT_DIR
+#echo "Mode 'CHROOT' activé:" ROOT_DIR
+#endif
+
+	;---------------------------------------------------------------------------
+	;			Gestion VIA2
+	;---------------------------------------------------------------------------
+#ifdef VIA2_6522
+#undef VIA2_FAKE
+#echo "Mode VIA2: 6522"
+#else
+#define VIA2_FAKE
+#echo "Mode VIA2: Fake"
 #endif
 
 ;---------------------------------------------------------------------------
@@ -207,8 +244,15 @@ CH376_MODE	= $99			; Mis à jour par Orix lors de l'appel
 
 HIMEM_PTR       = $a6
 
+CURLINE         = $A8                        ; Ligne courante
+VARNAME         = $B4                        ; 2 premiers caractères du nom de la variable
+
 TXTPTR          = $e9
 JOY_TBL         = $f3
+
+#ifdef ROM_122
+CURPOS          = $0030                        ; Position du curseur (écran ou imprimante)
+#endif
 
 ;---------------------------------------------------------------------------
 ;
@@ -236,6 +280,21 @@ PROGSTART       = $02a9
 PROGEND         = $02ab
 PROGTYPE        = $02ae
 
+#ifdef ROM_122
+IF_flag         = $0252                        ; b7: Pas de IF/IF
+LPRPOS          = $0258                        ; Position tête d'impressions
+SCREENY         = $0268                        ; N° de ligne du curseur
+SCREENX         = $0269                        ; N° de colonne du curseur
+SOUNDHIRES_ERR  = $02E0                        ; Drapeau erreur pour les instructions SOUND/HIRES
+PARAMS		= SOUNDHIRES_ERR
+PARAM1          = $02E1                        ; Paramètre 1 pour instructions SOUNDS/HIRES
+PARAM2          = $02E3                        ; Paramètre 2 pour instructions SOUNDS/HIRES
+PARAM3          = $02E5                        ; Paramètre 3 pour instructions SOUNDS/HIRES
+PRINTERFLG      = $02F1                        ; b7: Imprimante HS/ Imprimante OK
+#endif
+VDU_hook        = $0238                        ; JMP Char2Scr ; $F77C
+
+
 ;---------------------------------------------------------------------------
 ;
 ;			Spécifique Multi-Part
@@ -244,6 +303,17 @@ PROGTYPE        = $02ae
 OPENFFLAG	= $020f			; Flag pour détecter si un fichier .tap a été ouvert (0: Fichier ouvert, 1: Fichier fermé)
 MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams a été appelé)
 
+
+;---------------------------------------------------------------------------
+;
+;			I/O en page 3
+;
+;---------------------------------------------------------------------------
+VIA             = $0300                        ; VIA IORB
+VIA_IORA        = $0301
+VIA_DDRB        = $0302
+VIA_DDRA        = $0303
+
 ;---------------------------------------------------------------------------
 ;
 ;			Spécifique Telestrat
@@ -251,7 +321,13 @@ MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams 
 ;---------------------------------------------------------------------------
 VIA2_IORB    = $0320
 VIA2_DDRA    = $0323
-VIA2_IORA    = $032f
+
+#ifdef VIA2_6522
+	VIA2_IORA    = $032f
+#else
+	VIA2_IORA    = $0321
+#endif
+
 BUFEDT       = $0590
 
 ;---------------------------------------------------------------------------
@@ -266,6 +342,8 @@ CH376_DATA      = $0340
 ;			Routines ROM v1.1
 ;---------------------------------------------------------------------------
 CharGet         = $00e2
+
+PrintErrorX	= $c47e
 
 LC496           = $c496
 BackToBASIC     = $c4a8
@@ -283,11 +361,13 @@ TRON            = $cd16
 ; Pour DEF CHAR
 EvalComma	= $d065
 SyntaxError	= $d070
+FindVar		= $D1E8
+GIVAYF		= $D499
 DEF		= $D4BA
 DEF_USR		= $D4BE
 DEF_FN		= $D4DF
 GetByteExpr	= $d8c5
-
+MOVMF		= $DEAD
 TapeSync        = $e4ac
 GetTapeData     = $e4e0
 GetTapeParams   = $e7b2
@@ -316,6 +396,27 @@ CheckKbd        = $eb78
 
 #ifdef JOYSTICK_DEFAULT_CONF
 LEC9C           = $ec9c
+#else
+#ifdef ROM_122
+LEC9C           = $ec9c
+#endif
+#endif
+
+#ifdef ROM_122
+FindLine	= $c6b3
+RESTORE		= $c952
+GetExpr		= $cf03
+POS		= $d4a6
+WAIT		= $d958
+RowCalc		= $da0c
+GetWord		= $e853
+POINT		= $ec45
+LECB9		= $ecb9			; suite de CharGet en ROM
+Delay		= $eec9
+DrawLine	= $eef8
+LEFFA		= $effa
+ResetVIA	= $f9aa
+SOUND		= $fb40
 #endif
 
 StopTimer       = $ee1a
@@ -602,12 +703,57 @@ RESET_VECTOR    = $fffc
 			jsr	MultiPart
 			jmp	GetStoreRecallParams
 
-#ifndef FORCE_ROOT_DIR
-	load_charset2:
-		jsr	load_charset
-		jmp	FileClose
-#endif
+;#ifndef FORCE_ROOT_DIR
+;	load_charset2:
+;		jsr	load_charset
+;		jmp	FileClose
+;#endif
 	; Actuellement: $E6C6 si MULTIPART_SAVE, $E6BC sinon
+
+
+		;---------------------------------------------------------------------------
+		; 11 Octets
+		;---------------------------------------------------------------------------
+		; Fermeture du fichier après sauvegarde
+		;---------------------------------------------------------------------------
+#ifndef MULTIPART_SAVE
+		WriteClose:
+			lda #$01			; Fermeture avec mise à jour
+			sta OPENFFLAG			; Indique fichier fermé
+			jsr FileClose
+			jmp LE93D
+#endif
+
+
+		;---------------------------------------------------------------------------
+		; OpenForWrite ( 6 octets)
+		;---------------------------------------------------------------------------
+		; Ouvre un fichier en écriture
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;
+		; Modifie:
+		;	OPENFFLAG: Flag fichier ouvert
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	CloseOpenedFile
+		;	FileCreate
+		;---------------------------------------------------------------------------
+		; $fdd3: 'K' -> 'L'
+		; $ff61: '}' -> '}' (Hobbit)
+		OpenForWrite:
+		.(
+			jsr CloseOpenedFile
+			;jsr SetFilename2
+			jmp	FileCreate
+		.)
+
 	LE6C9:
 ;#print *
 #if * > $e6c9
@@ -828,30 +974,48 @@ RESET_VECTOR    = $fffc
 		; E6E1
 
 		;---------------------------------------------------------------------------
-		; 35 Octets + 5 en ZZD001 (ou 45+5 si FORE_UPPERCASE)
+		; 35 Octets + 5 en ZZD001 (ou 45+5 si FORCE_UPPERCASE)
 		;---------------------------------------------------------------------------
 			; SetFilename2: 38 octets
 		SetFilename2:
 		.(
 			;sta PTR_READ_DEST
 			;sty PTR_READ_DEST+1
+#ifdef SET_CHROOT
+			jsr	SetChroot
+			bne	fin
+#endif
 			lda	#CH376_CMD_SET_FILE_NAME
 			sta	CH376_COMMAND
+
 #ifdef FORCE_ROOT_DIR
 			sta	CH376_DATA		; Pour ouverture de '/'
 #endif
+
 			ldy	#$ff
+			;---
+			sty	$2f			; Flag pour détection du '.'
 		ZZ0003:
 			iny
 			;lda (PTR_READ_DEST),y
 			lda	PROGNAME,y
 			beq	ZZ0004
 
+			cmp	#'.'
+			bne	*+4
+			sty	$2f
+
 			sta	CH376_DATA
-			bne	ZZ0003
+;			bne	ZZ0003
+			jmp	ZZ0003
 
 		ZZ0004:
+			bit	$2f			; '.' vu?
 			sty	$2f			; Sauvegarde la longueur (utilisée par CSAVE)
+			bmi	ZZ0005-2			; Non -> ajoute '.TAP'
+			lda	#$00			; Ajoute <NULL>
+			beq	fin_null
+
 			ldy	#$ff			; Ajoute '.TAP'
 		ZZ0005:
 			iny
@@ -865,6 +1029,7 @@ RESET_VECTOR    = $fffc
 		        eor     #'a'-'A'
 		bk2
 #endif
+		fin_null
 			sta	CH376_DATA
 			bne	ZZ0005
 		fin
@@ -945,19 +1110,20 @@ RESET_VECTOR    = $fffc
 ;			; jsr	WriteRqData		; Flush du fichier (Inutile, effectué automatiquement par PutTapeByte)
 
 		;---------------------------------------------------------------------------
-		; 6 Octets
+		; 11 Octets
 		;---------------------------------------------------------------------------
 		; Fermeture du fichier après sauvegarde
+		; Transféré en $e6b6 pour libérer de la place pour pouvoir faire un chroot
 		;---------------------------------------------------------------------------
-#ifndef MULTIPART_SAVE
-		WriteClose:
-			lda #$01			; Fermeture avec mise à jour
-			sta OPENFFLAG			; Indique fichier fermé
-			jsr FileClose
-			jmp LE93D
-#endif
-	; Actuellement: $E72C si not defined(MULTIPART_SAVE)
-	; Actuellement: $E721 si defined(MULTIPART_SAVE)
+;#ifndef MULTIPART_SAVE
+;		WriteClose:
+;			lda #$01			; Fermeture avec mise à jour
+;			sta OPENFFLAG			; Indique fichier fermé
+;			jsr FileClose
+;			jmp LE93D
+;#endif
+	; Actuellement: $E734 si not defined(MULTIPART_SAVE)
+	; Actuellement: $E729 si defined(MULTIPART_SAVE)
 	LE735:
 ;#print *
 #if * > $e735
@@ -1204,7 +1370,7 @@ RESET_VECTOR    = $fffc
 
 #ifdef LOAD_CHARSET
 		;---------------------------------------------------------------------------
-		; load_charset (36 octets)
+		; load_charset (34 octets)
 		;---------------------------------------------------------------------------
 		; Charge le jeu de caractères par défaut en RAM
 		;
@@ -1241,7 +1407,7 @@ RESET_VECTOR    = $fffc
 			sty PROGSTART+1
 
 			; Adresse de fin
-			lda #<($b500+$300)
+			;lda #<($b500+$300)			; Inutile, le poids faible reste à 0
 			ldy #>($b500+$300)
 			sta PROGEND
 			sty PROGEND+1
@@ -1273,6 +1439,9 @@ RESET_VECTOR    = $fffc
 		;	Mount
 		;---------------------------------------------------------------------------
 		; $fd68: '<' -> 'B'
+
+		load_charset:
+			jsr	$f982				; Copie ROM->RAM (appelé depuis LF8B8 avec X=5)
 		InitCH376:
 		Exists:
 			ldx	#CH376_CMD_CHECK_EXIST
@@ -1466,7 +1635,6 @@ RESET_VECTOR    = $fffc
 										; IF .Z THEN
 			bne ZZ1002
 										; BEGIN;
-
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
 										; IF &PTR1 = '/' THEN
 			ldy #$00
@@ -1596,7 +1764,7 @@ RESET_VECTOR    = $fffc
 	new_patchl($fe50,48)
 #endif
 		;---------------------------------------------------------------------------
-		; SetByteReadWrite (33 octets)
+		; SetByteReadWrite (33 octets +15)
 		;---------------------------------------------------------------------------
 		; Calcule la taille du programme et effectue un SetByteRead ou SetByteWrite
 		;
@@ -1620,6 +1788,7 @@ RESET_VECTOR    = $fffc
 		;	SetByteWrite
 		;---------------------------------------------------------------------------
 		; $fd2d: '6' -> ':'
+		; $fe50: '[' -> '^' (Hobbit)
 		SetByteReadWrite
 		.(
 			sec				; Point d'entrée pour une lecture
@@ -1654,6 +1823,7 @@ RESET_VECTOR    = $fffc
 
 		; Message d'erreur (15 octets)
 		; $fdbf: 'I' -> 'J'
+		; $fe71: 'Livre' -> '(c)' (Hobbit)
 		FileNotFound_msg
 			.byte "FILE NOT FOUND",00
 ; ---]
@@ -1752,6 +1922,7 @@ RESET_VECTOR    = $fffc
 		;	-
 		;---------------------------------------------------------------------------
 		; $fd4e: ':' -> '='
+		; $fcb8: '(' -> '+' (Hobbit)
                 ReadUSBData3:
                 .(
 			; On lit 1 caractère
@@ -1786,6 +1957,7 @@ RESET_VECTOR    = $fffc
 		; 32 Octets
 		;---------------------------------------------------------------------------
 		; $fd8c: 'B' -> 'E'
+		; $fc90: '#' -> '&' (Hobbit)
 		SetByteWrite:
 			ldx	#CH376_CMD_BYTE_WRITE
 			jsr	CH376_Cmd2
@@ -1820,7 +1992,8 @@ RESET_VECTOR    = $fffc
 		; Efface la ligne de status + 'FILE NOT FOUND ERROR'
 		; Utilisé pour indiquer une erreur lors de la lecure d'un fichier
 		;---------------------------------------------------------------------------
-		; $fda7: 'F' -> 'H'
+		; $fda2: 'F' -> 'H'
+		; $fd50: ";" -> '=' (Hobbit)
 		_FileNotFound:
 			jsr LE93D
 ;			jmp $d35c
@@ -1840,7 +2013,7 @@ RESET_VECTOR    = $fffc
 
 ; [---
 #ifdef HOBBIT
-	new_patchl($ff50,40)
+	new_patchl($ff50,31)
 #endif
 		;---------------------------------------------------------------------------
 		; OpenForRead (17 octets) +8
@@ -1868,7 +2041,8 @@ RESET_VECTOR    = $fffc
 		;	CloseOpenedFile
 		;	FileOpen
 		;---------------------------------------------------------------------------
-		; $fdce: 'J' -> 'L'
+		; $fdba: 'H' -> 'L'
+		; $ff50: '{' -> 'Damier' (Hobbit)
 
 		OpenForRead:
 		.(
@@ -1921,6 +2095,7 @@ RESET_VECTOR    = $fffc
 			rts
 		.)
 
+#if 0
 		;---------------------------------------------------------------------------
 		; OpenForWrite ( 6 octets)
 		;---------------------------------------------------------------------------
@@ -1941,16 +2116,20 @@ RESET_VECTOR    = $fffc
 		;	CloseOpenedFile
 		;	FileCreate
 		;---------------------------------------------------------------------------
-		; $fddf: 'M' -> 'O'
+		; Transféré en $e6c1 pour libérer le caractère 127 utilisé par la démo VOLCANIC4
+		; (surtout valable pour la rom Hobbit)
+		;---------------------------------------------------------------------------
+		; $fdd3: 'K' -> 'L'
+		; $ff61: '}' -> '}' (Hobbit)
 		OpenForWrite:
 		.(
 			jsr CloseOpenedFile
 			;jsr SetFilename2
 			jmp	FileCreate
 		.)
-
+#endif
 		;---------------------------------------------------------------------------
-		; CloseOpenedFile ( 17 octets)
+		; CloseOpenedFile ( 13 octets)
 		;---------------------------------------------------------------------------
 		; Ferme le fichier actuellement ouvert et prépare l'ouverture d'un fichier
 		;
@@ -1968,17 +2147,20 @@ RESET_VECTOR    = $fffc
 		; Sous-routines:
 		;	FileClose
 		;---------------------------------------------------------------------------
+		; $fdd7: 'L' -> 'M'
+		; $ff61: '}' -> 'Damier' (Hobbit)
+		; Note: VOLCANIC4 nécessite la rom Hobbit et utilise le caractère "Plein"
 		CloseOpenedFile:
 		.(
 			lda OPENFFLAG			; Fichier ouvert?
 			bne suite
 			; Fermeture du fichier actuel
-			lda #$01			; Indique fichier fermé
-			sta OPENFFLAG
+			;lda #$01			; Indique fichier fermé
+			;sta OPENFFLAG
+			inc OPENFFLAG			; Indique fichier fermé
 			jsr FileClose
 		suite:
-			jsr SetFilename2
-			rts
+			jmp SetFilename2
 		.)
 ; ---]
 
@@ -2007,7 +2189,7 @@ RESET_VECTOR    = $fffc
 		;
 		; Appel: jsr xxx (remplace le jsr ReadKbdCol)
 		;---------------------------------------------------------------------------
-		; $fdf6: 'P' -> 'Y'
+		; $fde5: 'M' -> '\'
 		CheckJoystick:
 		.(
 			; Ne pas modifier A et X pour pouvoir appeler ReadKbdCol
@@ -2136,6 +2318,29 @@ RESET_VECTOR    = $fffc
 		.)
 #endif
 
+#ifdef SET_CHROOT
+	SetChroot:
+	.(
+			lda CHROOT_PATH
+			ldx #<(CHROOT_PATH+1)
+			ldy #>(CHROOT_PATH+1)
+			jsr open_fqn
+			cmp #ERR_OPEN_DIR
+			rts
+
+	; TEMPORAIRE POUR COMPATIBILITE
+	; TODO: Déplacer CHROOT_PATH VERS UNE ADRESSE FIXE A LA FIN DE CHARSET
+	.dsb $fe6f-*, $ea
+
+		CHROOT_PATH:
+			.byte PATH_END-*-1
+			.byte ROOT_DIR
+
+		PATH_END:
+			.dsb 33-(*-CHROOT_PATH),0
+	.)
+#endif
+
 #ifdef ADD_DEF_CHAR
 #echo "Add experimental DEF CHAR instruction"
 #define Token_USR  $D9
@@ -2149,6 +2354,62 @@ DEF_CHAR:
 	jmp DEF_USR
 	jmp DEF_FN
 
+#if 1
+	; Optimisation de la routine: gain -> 30 octets
+_DEF_CHAR:
+.(
+	LF171 = $f171				; Calcule l'adresse d'un caractère dans le jeu de caractères
+						; La routine considère qu'elle appelée en mode HIRES
+
+	jsr GetByteExpr
+	txa
+	beq getCharCode			; Jeu N°0 -> suite
+	cpx #$02				;
+	bcs Erreur				; >=2? -> Syntax Error
+
+getCharCode:
+	sta PARAM2				; N° jeu de caractères
+	jsr EvalComma
+
+	jsr GetByteExpr+3			; Récupère une valeur [0,255]
+	txa
+	jsr LF171+13				; Calcule l'adresse du caractère (résultat dans $0c-0d, ACC=($0d))
+	ldx fTextMode
+	bne suite
+	adc #($B5-$99)				; Ajoute l'offset en fonction du mode TEXT ou HIRES
+suite:
+	sta $0f
+;	dec $0f				; Correction de l'adresse à cause du +$f8
+	lda $0c
+	sta $0e
+	; Modifie le caractère
+	; /!\ ATTENTION: comme on ne passe pas par un buffer
+	;     le caractère sera en partie modifié en cas
+	;     d'erreur de syntaxe
+;	lda #$f8				; -8
+	lda #$00
+	sta $2f
+loop:
+	jsr EvalComma
+	jsr GetByteExpr+3			; Valeur en X (ILLEGAL QUANTITY si > 255)
+	ldy $2f
+	txa
+	and #$3f				; On masque les 2 premiers bits inutilisés par l'Oric :-(
+						; Ou on pourrait générer une erreur "ILLEGAL QUANTITY"
+	sta ($0e),y
+	; iny
+	; sty $00
+	inc $2f
+	cpy #$07
+	bne loop
+
+	rts
+
+Erreur:
+	jmp SyntaxError				; Renvoyer une erreur 27001 si ce qui suit le LET n'est pas valide
+.)
+
+#else
 _DEF_CHAR:
 .(
 	lda fTextMode				; Mode TEXT?
@@ -2248,6 +2509,166 @@ Erreur:
 .)
 #endif
 
+#endif
+
+		;---------------------------------------------------------------------------
+		; Table de conversion pour ERROR n
+		;---------------------------------------------------------------------------
+#ifdef ADD_ERROR
+		ErrTbl:
+			.byte $00,$10,$16,$2a,$35,$45,$4d,$5a
+			.byte $6b,$78,$85,$95,$a3,$a8,$b5,$c4
+			.byte $d7,$e5,$f5
+
+#endif
+
+#ifdef ADD_ONERROR
+	;---------------------------------------------------------------------------
+	; BUG: A=1:A=A/0 => A=10
+	; Correction: sauvegarder VARNAME ($B4-B5) et/ou $B6-$B7
+	;---------------------------------------------------------------------------
+		SetBasicVar:
+		.(
+			; Entrée avec X=Code erreur
+			; 14 Octets
+			jsr BasicErrToEn
+			;txa
+			tay
+			lda #$00
+			tax
+			jsr SetVar
+			; N° de la ligne
+			ldy CURLINE
+			lda CURLINE+1
+			;ldx #$01
+			ldx #$02
+
+		SetVar:
+			; 23 octets
+			pha
+			txa
+			;asl
+			lda VarTbl,x
+			sta VARNAME
+			lda VarTbl+1,x
+			sta VARNAME+1
+			pla
+
+
+			jsr GIVAYF
+			jsr FindVar
+			tax
+			jmp MOVMF
+
+		;VarTbl:
+		;	; 4 octets
+		;	.byte "EN","EL"
+		.)
+#endif
+
+#ifdef ADD_ONERROR
+#echo "Add experimental ON ERROR instruction"
+
+Token_ERROR = $85
+Token_GOTO = $97
+Token_CONT = $bb
+Token_STOP = $b3
+err_line = $00
+;err_line = TXTPTR
+UndefdStatementError = $ca23
+FindEndOfStatement = $ca4e
+EvalAcc = $D067
+FACC5 = $00cb
+		ON_ERROR:
+		.(
+			cmp #Token_ERROR
+			beq ok
+			jmp GetByteExpr+3
+
+		ok:
+			jsr CharGet
+			cmp #Token_CONT
+			beq cont
+			cmp #Token_STOP
+			beq break
+
+			; Rétabli ON ERROR STOP au cas où...
+			lda #$00
+			sta err_line+1
+
+			lda #Token_GOTO
+			jsr EvalAcc
+			jsr GetWord
+			jsr FindLine
+			bcc error8
+			; Sauvegarde l'adresse de début de la ligne
+			; de façon à pouvoir faire un GOTO sans devoir
+			; chercher à chaque l'adresse de la ligne
+			lda FACC5+3
+			sbc #$01
+			sta err_line
+			lda FACC5+4
+			sbc #$00
+			sta err_line+1
+
+			; Oublie l'adresse de retour vers ON
+			; En principe ACC ne peut pas être à 0
+			bne fin
+;		fin:
+;			rts
+
+		cont:
+			; err_line := $fe $ff
+			ldx #$fe
+			.byte $2c
+		break:
+			; err_line := $ff $00
+			ldx #$ff
+			stx err_line
+			inx
+		fin2:
+			stx err_line+1
+			pla
+			pla
+			jmp CharGet
+
+		error8:
+			jmp UndefdStatementError
+
+		&PrintErrorX2:
+			ldy err_line+1
+			; ON ERROR STOP?
+			beq error
+			iny
+			; ON ERROR CONT?
+			beq skip
+			; ON ERROR GOTO
+			dey
+			sty TXTPTR+1
+			lda err_line
+			sta TXTPTR
+		fin:
+			; Oublie l'adresse de retour vers PrintErrorX
+			pla
+			pla
+			jmp SetBasicVar
+		skip:
+			; Oublie l'adresse de retour vers PrintErrorX
+			; et saute à l'instruction suivante
+			pla
+			pla
+			jsr SetBasicVar
+			jmp FindEndOfStatement
+
+		error:
+			; Retour à PrintErrorX
+			;cpx #$13
+			;bcs skip
+			jmp SetScreen
+		.)
+
+#endif
+
 CharSet_end:
 
 #if * > KeyCodeTab
@@ -2265,9 +2686,9 @@ CharSet_end:
 ;---------------------------------------------------------------------------
 ;			Personnalisation de la ROM
 ;---------------------------------------------------------------------------
-	;
+	;---------------------------------------------------------------------------
 	; Message de Copyright
-	;
+	;---------------------------------------------------------------------------
 	new_patch($ed96,LEDC4)
 		; Maxi 44 octets
 		Copyright:
@@ -2280,9 +2701,10 @@ CharSet_end:
 			.dsb $EDC4-*,$00
 	LEDC4:
 
-	;
+
+	;---------------------------------------------------------------------------
 	; Couleur Papier/Encre au boot
-	;
+	;---------------------------------------------------------------------------
 	new_patchl($f914,10)
 
 			lda	#DEFAULT_INK
@@ -2295,12 +2717,652 @@ CharSet_end:
 ;			Modifications ROM 1.22
 ;---------------------------------------------------------------------------
 #ifdef ROM_122
+#echo "Patchs ROM 1.2x activés:"
+
+	;---------------------------------------------------------------------------
+	; Ajoute l'instruction RESTORE n
+	;---------------------------------------------------------------------------
+#echo "    RESTORE n (_PATCHRESTN)"
+	new_patchl($c03a,2)
+			.word _PATCHRESTN-1
+
+	;---------------------------------------------------------------------------
+	; Correction bug: dé-sélectionne l'imprimante avant le message 'Ready'
+	;---------------------------------------------------------------------------
+#echo "    Ready (_PATCHREADY)"
+	new_patchl(BackToBASIC,3)
+			; lsr IF_Flag
+			jsr _PATCHREADY
+
+	;---------------------------------------------------------------------------
+	; Autorise la saisie en minuscules
+	;---------------------------------------------------------------------------
+#echo "    minuscules (_PATCH2UP)"
+	new_patchl($c638,3)
+			jsr _PATCH2UP
+
+	;---------------------------------------------------------------------------
+	; Correction bug REM: aps d'encodage des instructions au delà du '
+	;---------------------------------------------------------------------------
+#echo "    REM (_PATCHREM)"
+	new_patchl($c65c,3)
+			jsr _PATCHREM
+
 	;---------------------------------------------------------------------------
 	; Correction bug IF/THEN/ELSE
+	;
+	;	IF test THEN instr1:instr2 ELSE instr3:instr4
+	;	Exécute instr1 & instr2 si test est vrai et instr3 & instr4 sinon
+	; BUG: exécute instr4 dans tous les cas
+	;
+	; Ce patch libère $CAB1->$CABE inclus (14 octets)
 	;---------------------------------------------------------------------------
-		new_patchl($c93c,3)
-				jsr	REM
+#echo "    IF/THEN/ELSE"
+	new_patchl($c93c,3)
+			; jsr LCAB1
+			jsr	REM
+
+	;---------------------------------------------------------------------------
+	; Correction bug initialisation de htab ($30) lors d'un PRINT @
+	;---------------------------------------------------------------------------
+#echo "    PRINT @"
+	new_patchl($cc8d,9)
+			; txa
+			; sta SCREENY
+			; jsr RowCalc
+			; lda $1f
+			sta CURPOS
+			txa
+			sta SCREENY
+			jsr RowCalc
+
+	;---------------------------------------------------------------------------
+	; Correction bug: initialise bien hpos à 0 quand un CR est envoyé à
+	; l'imprimante.
+	; Remarque: Cf _PATCHTAB
+	;---------------------------------------------------------------------------
+#echo "    Bug TAB
+	new_patchl($ccc7,3)
+			; jsr LCC0B	; -> rts
+			jsr _PATCHTAB
+
+	;---------------------------------------------------------------------------
+	; Utilisation de VDU_hook à la place de l'appel direct de Char2Scr
+	; dans la routine en $CCFB
+	;---------------------------------------------------------------------------
+#echo "    XVDU"
+	new_patchl($ccfe,3)
+			; jsr Char2Scr
+			jsr VDU_hook
+
+
+	;---------------------------------------------------------------------------
+	; Correction bug POS(): renvoit la bonne valeur même pour l'imprimante
+	;---------------------------------------------------------------------------
+#echo "    POS()"
+	new_patchl(POS+3,9)
+			ldy SCREENX
+			txa
+			beq $d4b6
+			jsr _PATCHPOS
+
+	;---------------------------------------------------------------------------
+	; Optimisation de l'instruction WAIT
+	;---------------------------------------------------------------------------
+#echo "    Optimsation WAIT"
+	new_patch(WAIT,LD967)
+		-WAIT:
+			; jsr GetExpr
+			; jsr FP2Int
+			; ldy INTTMP
+			; lda INTTMP+1
+			; lda #$02
+			; jmp Delay
+			jsr GetWord
+			tax
+			lda #$02
+			jmp Delay
+
+	;---------------------------------------------------------------------------
+	; Correction bug 'Ready': désactive l'imprimante AVANT l'affichage de Ready
+	;---------------------------------------------------------------------------
+#iflused _PATCHREADY
+#echo "        _PATCHREADY"
+		_PATCHREADY:
+			lsr IF_flag
+			jmp SetScreen
+#else
+			.dsb 6, $ea
 #endif
+		LD967:
+
+	;---------------------------------------------------------------------------
+	; Optimisation TAN
+	;---------------------------------------------------------------------------
+#echo "    Optimisation TAN"
+	new_patchl($e3e9,3)
+			; jsr LE388	; -> jmp LDEAD
+			jsr MOVMF
+
+	;---------------------------------------------------------------------------
+	; Correction bug: la fermeture du relais pour le magnétophone génère aussi
+	; un STROBE pour l'imprimante (routine SetupTape)
+	;---------------------------------------------------------------------------
+#echo "    SetupTape (STROBE)"
+	new_patchl($e77c,2)
+			; lda #$40
+			lda #$50
+
+	;---------------------------------------------------------------------------
+	; Correction instruction POINT(x,y) pour n'accepter qu'ne valeur numérique
+	; pour x et y
+	;---------------------------------------------------------------------------
+#echo "    POINT(x,y)"
+	new_patchl(POINT+3,3)
+			; jsr EvalExpr
+			jsr GetExpr
+
+	new_patchl(POINT+34,3)
+			; jsr EvalExpr
+			jsr GetExpr
+
+	;---------------------------------------------------------------------------
+	; Optimisation routine GetChar: gain 9 cycles et 1 octet ($F2)
+	;---------------------------------------------------------------------------
+#echo "    Optimisation GetChar"
+	new_patchl(LEC9C+13,3)
+			; jsr LECB9
+			; rts
+			jmp	LECB9
+
+	;---------------------------------------------------------------------------
+	; Correction bug hpos: ne peut être mis si on utilise une configuration par
+	; défaut du joystick (utilise la même zone rom)
+	; Ecrase également la valeur d'init de RND
+	;
+	; Peut être déplacé en $FBB5 si optimisation de SOUND
+	; ou en $CAB1 si correction du bug IF/THEN/ELSE
+	;---------------------------------------------------------------------------
+#iflused _PATCHTAB
+#echo "        _PATCHTAB"
+;	new_patchl(LEC9C+17,10)
+	new_patchl($cab1,10)
+		_PATCHTAB:
+			bit PRINTERFLG
+			bpl LECB6
+			lda #$00
+			sta CURPOS
+		LECB6:	rts
+#endif
+
+	;---------------------------------------------------------------------------
+	; Amélioration DRAW
+	;
+	; Remarque: Utilise des octets supplémentaires en page 0 ($06-$0f)
+	;---------------------------------------------------------------------------
+#echo "    Améliorations DRAW"
+	new_patch((DrawLine+4),LEFB1)
+
+		LEEFC:
+		.(
+			; draw vectors
+			Ivect = $06;
+			Jvect = $09;
+
+			; draw variables
+			intlen = $0D	; length of segments, int part
+			fraclen = $0C	; length of segments, fract part
+			lcount = $0F	; line count
+			fracsum = $0E	; cumulative sum of fractionary parts
+
+			_HRSPRVPIX = $f0b2
+			_HRSPRVLINE = $f095
+			_0CDIV200 = $efc8
+			_ROUND0C = $effa
+			_HRSNXTPIX = $f0a1
+			_HRSNXTLINE = $f089
+
+			; *= $EEFC	; location in Oric ROM
+			LDX #$06
+		_drwinivect
+			LDA _drwvect-1,X
+			STA Ivect-1,X
+			DEX
+			BNE _drwinivect
+			BIT PARAMS+2	; test sign of dx
+			BPL _testy	; if positive, continue
+			LDA #$FF	; if negative
+			EOR PARAMS+1
+			TAX
+			INX
+			STX PARAMS+1	; dx.b=-dx
+			LDA #<_HRSPRVPIX; change Ivect (low byte only)
+			STA Ivect+1
+		_testy
+			BIT PARAMS+4	; test sign of dy
+			BPL _testxy
+			LDA #$FF
+			EOR PARAMS+3
+			TAX
+			INX
+			STX PARAMS+3	; dy.b=-dy
+			LDA #<_HRSPRVLINE; change Jvect (low byte only)
+			STA Jvect+1
+		_testxy
+			LDX PARAMS+1	; X=dx
+			LDY PARAMS+3	; Y=dy
+			CPY PARAMS+1	; compare dy and dx
+			BCC _divxy		; if dy < dx, jump
+			TXA
+			PHA
+			LDA Ivect+1		; else, swap Ivect & Jvect (low bytes)
+			LDX Jvect+1
+			STX Ivect+1
+			STA Jvect+1
+			TYA		; and swap dx and dy
+			TAX
+			PLA
+			TAY
+		_divxy
+			CPX #$00
+			BEQ _drwend		; if dx = 0, end (nothing to draw !)
+			LDA #$00
+			STA $0C
+			STA $201
+			INX
+			STX $0D		; $0C.w = 256*(dx+1)
+			INY
+			STY $200		; $200.w = dy+1
+			JSR _0CDIV200	; $0C.w=int((dx+1)/(dy+1))
+			JSR _ROUND0C
+			STY lcount		; line counter = dy+1
+			LDX intlen		; X=normal length of segments
+			CLC
+			LDA #$80		; A=0.5: add 1/2 a pixel at start
+			ADC fraclen
+			STA fracsum
+			BCC _1stsegm	; if fract. part < 0.5, continue
+			INX		; if fract. part >=0.5 => add 1 point to 1st segment
+		_1stsegm			; draw first segment
+			DEX		; => substract one pixel (from previous CURSET)
+			BEQ _nextsegm	; if 0 pix, jump to next segment
+		_nextpix
+			JSR Ivect
+			JSR _DRWSETPIX	; set pixel (modify A and Y!)
+			DEX
+			BNE _nextpix
+		_nextsegm
+			LDX intlen		; re-init segment length
+			CLC
+			LDA fracsum		; cumulate fract. parts
+			ADC fraclen
+			STA fracsum
+			BCC _stdsegm	; if no carry, standard segment
+			INX		; else, add 1 point to current segment
+		_stdsegm
+			DEC lcount
+			BEQ _drwend		; no more line ? => end
+			JSR Jvect		; goto next line
+			JMP _nextpix
+		_drwend
+			RTS
+
+		_drwvect
+			JMP _HRSNXTPIX	; draw vector init table
+			JMP _HRSNXTLINE
+		;--------------------------------------------------------------------
+		; Name:		_DIVA0D
+		; Function:	divide A/$0D (quick 8 bit divide)
+		;
+		; Input:	- A = dividend
+		; 	- $0D = divider
+		;
+		; Output:	- A = result
+		;         - $0E = remainder
+		;	- $0C = copy of the result
+		;
+		; Side effects:	- $0C is affected: contains a copy of the result
+		;		- X and Y remain unchanged
+		;
+		;--------------------------------------------------------------------
+		; div variables
+		remain = $0E
+		result = $0C
+		divid = $0D
+
+		&_DIVA0D:
+			STA result		; result = A
+			TXA
+			PHA		; save X
+			LDA #$00		; remainder = 0
+			LDX #$08		; X=#$08, loop 8 times (8 bit word)
+		_divloop
+			ASL result		; result * 2
+			ROL		; remainder*2 + carry from N
+			CMP divid
+			BCC _divcont1	; continue if rem.<divider
+			SBC divid		; else remainder = remainder-divider
+					; (C=1 after BCC!)
+			INC result		; result++: add 1 to result
+		_divcont1
+			DEX	 	; next bit
+			BNE _divloop	; loop
+			STA remain		; save remainder in $0E
+			PLA
+			TAX		; restore X
+			LDA result		; A=result
+		LEFB0	RTS
+		.)
+	LEFB1:
+
+	;---------------------------------------------------------------------------
+	; Espace inutilisé: LEFB1 -> LEFC7 inclus (23 octets)
+	;---------------------------------------------------------------------------
+	;LEFC7:
+
+	;---------------------------------------------------------------------------
+	; Espace inutilisé: LF016 -> LF01B inclus (6 octets)
+	;---------------------------------------------------------------------------
+
+	new_patchl($f01c,8)
+		_DRWSETPIX:	; set current pixel when drawing
+		.(
+			_DRWPAT = $0214
+			ASL _DRWPAT		; get bit#7 in C, and clear bit#0
+			BCC $F03C		; if 0, end
+			INC _DRWPAT		; else set pattern bit#0 to 1 (=C)
+					; ... and set the pixel
+		.)
+	new_patchl($f05a,12)
+		.(
+			divid = $0D
+			LDA #$06
+			STA divid
+			TXA
+			JSR _DIVA0D	; A=X/6 : quick div
+			CLC
+			JMP $F06E
+		.)
+
+	new_patchl($f400,3)
+			JSR _DRWSETPIX	; call new _DRWSETPIX !
+
+	;---------------------------------------------------------------------------
+	; Correction bug
+	;---------------------------------------------------------------------------
+#echo "    Bug arrondir quotient ($EFFA...)"
+	new_patchl(LEFFA,7)
+			; pha
+			; asl $0200		; $0200.w x2
+			; rol $0201
+			pha
+			lsr $0201		; $0200.w /2
+			ror $0200
+
+	;---------------------------------------------------------------------------
+	; Optimisation routine ReadKbdCol: gain 19 cycles et 2 octet ($F576-$F577)
+	;---------------------------------------------------------------------------
+#echo "    Optimisation ReadKbdCol"
+	new_patch((ReadKbdCol+18),LF578)
+			;ldy	#$04
+			;dey
+			;bne	*-3
+			jmp	LF578
+			nop
+			nop
+		LF578:
+
+;#ifdef ROM_122
+#endif
+
+	;---------------------------------------------------------------------------
+	; Déplacement du CLI APRES l'initialisation des vecteurs en ram
+	;---------------------------------------------------------------------------
+#echo "    Bug: initialisaton des vecteurs"
+	new_patchl(Reset+3,13)
+			;ldx	#$FF
+			;txs
+			;cli
+			cld
+			ldx	#$12
+		LF896:
+			lda	$F87C,x
+			sta	VDU_hook,x                      ; F899 9D 38 02
+			dex
+			bpl	LF896
+			cli			; Correction
+			;lda	#$20
+			;sta	$024E
+			;lda	#$04
+			;sta	$024F
+			;jsr	RamTest
+			;jsr	LF8B8
+
+	;---------------------------------------------------------------------------
+	; Minuscules
+	; /!\ Activer  _PATCH2UP sinon ça ne sert à rien
+	;---------------------------------------------------------------------------
+#ifdef ROM_122
+#echo "    minuscules par défaut"
+	new_patchl($f8c8,2)
+			; lda #$ff		; MAJUSCULES par défaut
+			lda #$7f		; minuscules par défaut
+
+	;---------------------------------------------------------------------------
+	; Correction bug: supprime la génération d'un STROBE lors de l'initialisation
+	; du VIA
+	;---------------------------------------------------------------------------
+#echo "    ResetVIA (STROBE)"
+	new_patchl(ResetVIA,15)
+			; lda     #$FF                            ; F9AA A9 FF
+			; sta     VIA_DDRA                        ; F9AC 8D 03 03
+			; lda     #$F7                            ; F9AF A9 F7
+			; sta     VIA_DDRB                        ; F9B1 8D 02 03
+			; lda     #$B7                            ; F9B4 A9 B7
+			; sta     VIA                             ; F9B6 8D 00 03
+			lda     #$FF
+			sta     VIA_DDRA
+			lda     #$B7
+			sta     VIA
+			lda     #$F7
+			sta     VIA_DDRB
+
+	;---------------------------------------------------------------------------
+	; Optimisation instruction SOUND (pour libérer de la place pour les autres
+	; patches)
+	;---------------------------------------------------------------------------
+#echo "    Optimisation SOUND"
+	new_patch(SOUND,LFB7E)
+		-SOUND:		; This function has been optimized in order to free
+				; as much memory as possible to put my patches
+			LDX PARAM2	; X = sound period (LSB)
+			LDY PARAM1	; Y = channel# (c)
+			BEQ LFB7A	; if null, error
+			CPY #$04	; noise channel (c>3) ?
+			BCS LFB6E	; yes: jump
+			DEY		; Y = c-1
+			TYA
+			PHA		; push c-1
+			ASL		; x2 => A=period register of channel (LSB)
+			PHA 		; push
+			JSR $F590	; write X in reg.A of W8912
+			PLA		; restore A
+			CLC
+			ADC #$01	; +1 => A=next register
+			LDX PARAM2+1	; X = MSB of period (4 bits used)
+		LFB5B:	JSR $F590	; write X in reg. A
+			LDA PARAM3	; A = volume
+			AND #$0F	; mod.16
+			BNE LFB67
+			LDA #$10	; if 0, then 16 (envelop)
+		LFB67:	TAX		; into X
+			PLA		; restore A (A=c-1)
+			ORA #$08	; +8 => A=volume register
+			JMP $F590	; write X in reg.A and return
+		LFB6E:	CPY #$07	; if channel >6
+			BCS LFB7A	; branch to error
+			TYA		; A=c
+			AND #$FB	; -4 =>A=c-1 with no noise
+			PHA 		; push c-1
+			LDA #$06	; A=6, noise period reg. (5 bits sign.)
+			BNE LFB5B	; in fact a BRA(!):set period & vol.
+		LFB7A:	INC SOUNDHIRES_ERR	; indicate error
+			RTS 		; return (and WIN 82 extra FREE bytes!)
+		LFB7E:
+
+	;---------------------------------------------------------------------------
+	; Correction bug REM: ne code pas les instructions au delà de '
+	; (Inclus les 5 patches suivants)
+	;
+	; /!\ Ne peut être activer que si le patch SOUND a été également activé
+	;---------------------------------------------------------------------------
+#iflused _PATCHREM
+#echo "        _PATCHREM"
+	; new_patch(LFB7E,LFBB5)
+	new_patch(LFB7E,LFBCF)
+		_PATCHREM:		; patch not to code remarks after " ' "
+					; (correct a BUG of ROM v1.1)
+			SEC		; set Z=1 if current token is REM or "'"
+			SBC #$63	; = REM ?
+			BEQ LFB85	; yes, Z=1, return
+			SBC #$8A	; = "'" ?
+		LFB85:	RTS 		; return
+#endif
+
+	;---------------------------------------------------------------------------
+	; Autorise la saisie en MAJUSCULES et en minuscules
+	; /?\ Utile?
+	;---------------------------------------------------------------------------
+#iflused _PATCH2UP
+#echo "        _PATCH2UP"
+		_PATCH2UP:		; conv.lower cases to upper
+					; =>allows typing commands of BASIC & DOS in lower cases
+			LDA $00,X	; A=current char
+			CMP #$61	; 'a'
+			BCC LFB94	; if <'a', do nothing
+			CMP #$7B	; 'z'+1
+			BCS LFB95	; if >'z', do nothing
+			SBC #$1F	; else substract $20 ($20=$1F + carry!!)
+			STA $00,X	; store converted char
+		LFB94:	SEC		; set C=1 for compatibility
+		LFB95:	RTS		; return (always with C=1)
+#endif
+
+	;---------------------------------------------------------------------------
+	; Correction bug POS(): renvoit la bonne valeur même pour l'imprimante
+	;---------------------------------------------------------------------------
+#iflused _PATCHPOS
+#echo "        _PATCHPOS"
+		_PATCHPOS:		; get the correct value for POS if printer is ON
+					; (BUG v1.1)
+			LDY LPRPOS	; get the correct horiz.pos value
+			BIT PRINTERFLG	; for compatibility...
+			RTS		; return
+#endif
+
+	;---------------------------------------------------------------------------
+	; Correction bug REM: ne code pas les instructions au delà de REM
+	;---------------------------------------------------------------------------
+#iflused _PATCHRESTN
+#echo "        _PATCHRESTN"
+		_PATCHRESTN:		; offers a RESTORE n to your ATMOS!
+			BNE LFBA2	; a parameter after RESTORE ?
+			JMP RESTORE	; no: jump to classic RESTORE
+		LFBA2:	JSR GetWord	; yes: get num parameter
+			JSR FindLine	; find that line (or next available)
+			LDA $CE	; make AY point to it
+			LDY $CF
+			SEC
+			SBC #$01	; -1 to the LSB
+			JMP RESTORE+7	; finish the substract (MSB!!),
+					; and update RESTORE pointer
+			; LFBB2 -> LFBCF: disponible
+		LFBB2:
+			;nop
+			;nop
+			;nop
+		LFBB5:
+#endif
+
+	;---------------------------------------------------------------------------
+	; Si optimisation de SOUND, $FBB5 -> $FBCF: libre (27 octets)
+	;---------------------------------------------------------------------------
+#ifdef ADD_ERROR
+#echo "Add experimental ERROR instruction"
+		ERROR:
+		.(
+			; 19 Octets
+			jsr GetByteExpr+3
+			txa
+			beq Skip
+			cpx #$14
+			bcs UserError
+			dex
+			lda ErrTbl,x
+		OnError:
+			tax
+			jmp PrintErrorX
+
+		UserError:
+			;jmp SyntaxError
+			lda #$15
+			ldy err_line+1
+			; ON ERROR STOP?
+			beq OnError
+			iny
+			; ON ERROR CONT?
+			;beq Skip
+			;jmp $c496
+			bne OnError+1
+		Skip:
+			rts
+		.)
+#endif
+
+
+#if * > $fbcf
+#print "*** ERROR PATCH SOUND too long"
+#endif
+
+	LFBCF:
+; #ifdef ROM_122
+#endif
+
+#ifdef ADD_ONERROR
+	;---------------------------------------------------------------------------
+	; Entréé:
+	;	X: Code erreur pour PrintErreurX
+	;
+	; Sortie:
+	;	A: Code erreur traduit
+	;---------------------------------------------------------------------------
+	new_patch($efb1,LEFC7)
+		BasicErrToEn:
+		.(
+			txa
+			ldy #$00
+		loop:
+			iny
+			cpy #$14
+			beq fin
+			cmp ErrTbl-1,y
+			bne loop
+			tya
+		fin:
+			;tax
+			rts
+		.)
+
+		VarTbl:
+			; 4 octets
+			.byte "EN","EL"
+
+		LEFC7:
+#if * > $efc7
+#print "*** ERROR PATCH ON ERROR (EFB1) too long"
+#endif
+#endif
+
 ;---------------------------------------------------------------------------
 ;			Modifications pour Orix
 ;---------------------------------------------------------------------------
@@ -2447,7 +3509,8 @@ CharSet_end:
 	; On suppose que l'Oric a déjà démarré et que le jeu est en place
 	; Initialise le CH376 au lieu d copier le jeu ROM->RAM
 	new_patchl(LF8B8+26,3)
-	jsr InitCH376
+	;jsr InitCH376
+	jsr load_charset
 #endif
 
 ;---------------------------------------------------------------------------
@@ -2459,11 +3522,11 @@ CharSet_end:
 	; On suppose que l'Oric a déjà démarré et que le jeu est en place
 	; Charge un jeu decaractères depuis la carte SD/USB
 	new_patchl(LF8B8+26,3)
-#ifdef FORCE_ROOT_DIR
+;#ifdef FORCE_ROOT_DIR
 	jsr load_charset
-#else
-	jsr load_charset2
-#endif
+;#else
+;	jsr load_charset2
+;#endif
 
 #endif
 
@@ -2475,3 +3538,39 @@ CharSet_end:
 	jmp DEF_CHAR
 #endif
 
+;---------------------------------------------------------------------------
+;		Ajout instruction ERROR
+;---------------------------------------------------------------------------
+#ifdef ADD_ERROR
+	;---------------------------------------------------------------------------
+	; Remplace TROFF par ERROR
+	;---------------------------------------------------------------------------
+	new_patchl($c100,5)
+			.byte "ERRO","R"+$80
+
+	;---------------------------------------------------------------------------
+	; Modifie adresses d'exécution TROFF -> QUIT
+	; au cas ou...
+	;---------------------------------------------------------------------------
+	new_patchl($c010,2)
+			.word ERROR-1
+
+#endif
+
+;---------------------------------------------------------------------------
+;		Ajout instruction ON ERROR STOP|CONT|GOTO
+;---------------------------------------------------------------------------
+#ifdef ADD_ONERROR
+	;---------------------------------------------------------------------------
+	; Patch de l'instruction ON x GOTO/GOSUB
+	;---------------------------------------------------------------------------
+	new_patchl($cac2,3)
+			jsr ON_ERROR
+
+
+	;---------------------------------------------------------------------------
+	; Patch de la routine PrintErrorX
+	;---------------------------------------------------------------------------
+	new_patchl(PrintErrorX,3)
+			jsr PrintErrorX2
+#endif
