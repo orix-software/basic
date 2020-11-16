@@ -9,22 +9,42 @@ addons:
                         - curl
 
 install:
-    # - sudo apt-get update -qq
-    # - sudo apt-get install -qq curl
+    - sudo apt-get update -qq
+    - sudo apt-get install -qq python3
     # - sudo apt-get install -qq git
     # - sudo pip install --upgrade pip
     # - sudo pip install mkdocs
     # - git clone https://github.com/oric-software/buildTestAndRelease.git
     # - cd buildTestAndRelease/ && sh make.sh
     #- pushd ..
-    - git clone --branch xa-2.3.9 https://github.com/fachat/xa65.git
+    - sudo pip install --upgrade pip
+    - pip install pathlib
+    - pip install pycurl    
+    - cd tools && git clone https://github.com/assinie/md2hlp.git
+    - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
     - pushd xa65/xa && make &> /dev/null
     - cp file65 ldo65 reloc65 xa /home/travis/bin
     - popd
 
+script:
+    - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make
+    - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make
+
 after_success:
-        - VERSION=`cat VERSION`
-        - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basicsd.rom orix/usr/share/basic/$VERSION/basicsd.rom
-        - mkdir -p orix/etc/orixcfg/$VERSION/ && echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
-        - cd orix && tar -zcvf ../basic.tgz * && cd ..
-        - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
+    - VERSION=`cat VERSION`
+    - python -V
+    - cd tools && python3 retrieveSoftwareOricOrg.py && cd ..
+    - ls
+    - cd tools && builddocs.sh
+    - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basic*.rom orix/usr/share/basic/$VERSION/
+    - mkdir -p orix/etc/orixcfg/$VERSION/ && echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
+    - mkdir -p orix/usr/share/basic/0/
+    - mkdir -p orix/usr/share/basic/1/
+    - mkdir -p orix/usr/share/basic/2/    
+    - echo "Basicsd Games v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicusb Games v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - cd orix && tar -zcvf ../basic.tgz * && cd ..
+    - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
