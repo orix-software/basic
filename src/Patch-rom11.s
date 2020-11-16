@@ -103,6 +103,7 @@
 	; Pris en charge par le Makefile
 	;---------------------------------------------------------------------------
 ; #define BASIC_QUIT
+; #define ROM_122
 
 	;---------------------------------------------------------------------------
 	;				Défaut
@@ -115,7 +116,6 @@
 #define ROOT_DIR "/HOME/BASIC11"
 ;#define ROOT_DIR "/"
 #define FAST_LOAD
-#define ROM_122
 #define JOYSTICK_DEFAULT_CONF
 #undef AUTO_USB_MODE
 #undef MULTIPART_SAVE

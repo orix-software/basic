@@ -9,6 +9,7 @@ USB_MODE ?= sdcard
 BACK_TO_ORIX ?= yes
 JOYSTICK ?= yes
 EXPERIMENTAL ?= no
+ROM122 ?= no
 
 # %<-------------------------------------------------------------------------->%
 #               Ne rien modifier au dela de cette ligne
@@ -60,7 +61,12 @@ else
 		JOYSTICK = yes
 		EXPERIMENTAL = no
 	else
-		COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+		ifeq ($(ROM122),yes)
+			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.2"
+			ASFLAGS += -DROM_122=yes
+		else
+			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+		endif
 		ROMID := 2
 	endif
 endif
