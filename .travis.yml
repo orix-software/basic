@@ -18,21 +18,24 @@ install:
     - pushd xa65/xa && make &> /dev/null
     - cp file65 ldo65 reloc65 xa /home/travis/bin
     - popd
-    - python -V
 
 script:
+    - cd $TRAVIS_BUILD_DIR
     - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make
     - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make
     - cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
 
 after_success:
+    - cd $TRAVIS_BUILD_DIR
     - VERSION=`cat VERSION`
-    - mkdir orix/usr/share/basic/$VERSION -p && cp build/cart/basic*.rom orix/usr/share/basic/$VERSION/
-    - mkdir -p orix/etc/orixcfg/$VERSION/ && echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
+    - mkdir -p orix/usr/share/basic/$VERSION 
+    - mkdir -p orix/etc/orixcfg/$VERSION
+    - cp build/cart/basic*.rom orix/usr/share/basic/$VERSION/
+    - echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicsd Games v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicusb Games v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-    - tar -zcvf ../basic.tgz -C orix *
+    - tar -zcvf basic.tgz -C orix *
     - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
