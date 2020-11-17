@@ -8,9 +8,9 @@ addons:
                 packages:
                         - curl
                         - python3
+                        - python3-pip
 
 install:
-    - sudo pip3 install --upgrade pip3
     - pip3 install pathlib
     - pip3 install pycurl
     - pushd tools && git clone https://github.com/assinie/md2hlp.git
