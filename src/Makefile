@@ -10,6 +10,7 @@ BACK_TO_ORIX ?= yes
 JOYSTICK ?= yes
 EXPERIMENTAL ?= no
 ROM122 ?= no
+FAST ?= yes
 
 # %<-------------------------------------------------------------------------->%
 #               Ne rien modifier au dela de cette ligne
@@ -64,10 +65,11 @@ else
 		ifeq ($(ROM122),yes)
 			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.2"
 			ASFLAGS += -DROM_122=yes
+			# ROMID := 3
 		else
 			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+			ROMID := 2
 		endif
-		ROMID := 2
 	endif
 endif
 
@@ -103,6 +105,12 @@ endif
 ifeq ($(JOYSTICK),yes)
 	COPYRIGHT_MSG_AUTO += ,"/JOY"
 	ASFLAGS += -DJOYSTICK_DRIVER
+endif
+
+
+ifeq ($(FAST),yes)
+	COPYRIGHT_MSG_AUTO += ,"/F"
+	ASFLAGS += -DFAST_LOAD
 endif
 
 

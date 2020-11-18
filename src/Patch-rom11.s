@@ -104,6 +104,7 @@
 	;---------------------------------------------------------------------------
 ; #define BASIC_QUIT
 ; #define ROM_122
+; #define FAST_LOAD
 
 	;---------------------------------------------------------------------------
 	;				Défaut
@@ -115,7 +116,7 @@
 #define FORCE_ROOT_DIR
 #define ROOT_DIR "/HOME/BASIC11"
 ;#define ROOT_DIR "/"
-#define FAST_LOAD
+;#define FAST_LOAD
 #define JOYSTICK_DEFAULT_CONF
 #undef AUTO_USB_MODE
 #undef MULTIPART_SAVE
@@ -136,7 +137,7 @@
 ;#define FORCE_ROOT_DIR
 ;#define ROOT_DIR "/USR/SHARE/GAMES"
 #define ROOT_DIR "/USR/SHARE/BASIC11"
-#define FAST_LOAD
+;#define FAST_LOAD
 #undef EXPERIMENTAL
 #undef ROM_122
 #undef MULTIPART_SAVE
@@ -179,9 +180,9 @@
 	;---------------------------------------------------------------------------
 #ifdef EXPERIMENTAL
 #define ADD_DEF_CHAR
-#define ADD_ERROR
 
 #ifdef ROM_122
+#define ADD_ERROR
 #define ADD_ONERROR
 #endif
 
@@ -280,7 +281,7 @@ PROGSTART       = $02a9
 PROGEND         = $02ab
 PROGTYPE        = $02ae
 
-#ifdef ROM_122
+;#ifdef ROM_122
 IF_flag         = $0252                        ; b7: Pas de IF/IF
 LPRPOS          = $0258                        ; Position tête d'impressions
 SCREENY         = $0268                        ; N° de ligne du curseur
@@ -291,7 +292,7 @@ PARAM1          = $02E1                        ; Paramètre 1 pour instructions 
 PARAM2          = $02E3                        ; Paramètre 2 pour instructions SOUNDS/HIRES
 PARAM3          = $02E5                        ; Paramètre 3 pour instructions SOUNDS/HIRES
 PRINTERFLG      = $02F1                        ; b7: Imprimante HS/ Imprimante OK
-#endif
+;#endif
 VDU_hook        = $0238                        ; JMP Char2Scr ; $F77C
 
 
@@ -850,6 +851,7 @@ RESET_VECTOR    = $fffc
 
 
 #ifdef FAST_LOAD
+#echo "Mode Fast Load: activé"
 		;---------------------------------------------------------------------------
 		; Pas de CLOAD "",V dans ce mode
 		;---------------------------------------------------------------------------
