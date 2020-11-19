@@ -25,7 +25,7 @@ script:
     - ROM122=yes make && make clean
     - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make && make clean
     - USB_MODE=usb ROM122=yes make && make clean
-    - cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
+      # - cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
 
 after_success:
     - cd $TRAVIS_BUILD_DIR
