@@ -19,7 +19,7 @@ stages:
 jobs:
     include:
         - stage: compile
-         install:
+          install:
             - pushd tools && git clone https://github.com/assinie/md2hlp.git
             - popd
             - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
@@ -27,7 +27,7 @@ jobs:
             - cp file65 ldo65 reloc65 xa /home/travis/bin
             - popd
 
-         script:
+          script:
             - cd $TRAVIS_BUILD_DIR
             - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make && make clean
             - ROM122=yes make && make clean
@@ -35,11 +35,11 @@ jobs:
             - USB_MODE=usb ROM122=yes make && make clean
 
         - stage: softwares
-         if: branch = master && type = cron
-         script: cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
+          if: branch = master && type = cron
+          script: cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
 
         - stage: package
-         script:
+          script:
             - cd $TRAVIS_BUILD_DIR
             - VERSION=`cat VERSION`
             - mkdir -p orix/usr/share/basic11/$VERSION
