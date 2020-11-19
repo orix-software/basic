@@ -12,21 +12,13 @@ addons:
         - python3-pycurl
 
 stages:
-    - compile
-    - software
-    - package
+    - test
+    - release
 
 jobs:
     include:
-        - stage: compile
-          install:
-            - pushd tools && git clone https://github.com/assinie/md2hlp.git
-            - popd
-            - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
-            - pushd xa65/xa && make &> /dev/null
-            - cp file65 ldo65 reloc65 xa /home/travis/bin
-            - popd
-
+        - stage: test
+          if: branch != master
           script:
             - cd $TRAVIS_BUILD_DIR
             - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make && make clean
@@ -34,24 +26,38 @@ jobs:
             - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make && make clean
             - USB_MODE=usb ROM122=yes make && make clean
 
-        - stage: softwares
+        - stage: release
           if: branch = master && type = cron
-          script: cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
-
-        - stage: package
           script:
             - cd $TRAVIS_BUILD_DIR
-            - VERSION=`cat VERSION`
-            - mkdir -p orix/usr/share/basic11/$VERSION
-            - mkdir -p orix/usr/share/basic11
-            - mkdir -p orix/etc/orixcfg/$VERSION
-            - cp build/cart/basic*.rom orix/usr/share/basic11/$VERSION/
-            - cp build/cart/basic*.rom orix/usr/share/basic11/
-            - echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
-            - echo "Basicsd Games v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-            - echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-            - echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-            - echo "Basicusb Games v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-            - echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-            - cd orix && tar -zcvf ../basic.tgz *
-            - cd $TRAVIS_BUILD_DIR
+            - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make && make clean
+            - ROM122=yes make && make clean
+            - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make && make clean
+            - USB_MODE=usb ROM122=yes make && make clean
+            - cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
+
+
+install:
+    - pushd tools && git clone https://github.com/assinie/md2hlp.git
+    - popd
+    - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
+    - pushd xa65/xa && make &> /dev/null
+    - cp file65 ldo65 reloc65 xa /home/travis/bin
+    - popd
+
+after_success:
+    - cd $TRAVIS_BUILD_DIR
+    - VERSION=`cat VERSION`
+    - mkdir -p orix/usr/share/basic11/$VERSION
+    - mkdir -p orix/usr/share/basic11
+    - mkdir -p orix/etc/orixcfg/$VERSION
+    - cp build/cart/basic*.rom orix/usr/share/basic11/$VERSION/
+    - cp build/cart/basic*.rom orix/usr/share/basic11/
+    - echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicsd Games v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicusb Games v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+    - cd orix && tar -zcvf ../basic.tgz *
+    - cd $TRAVIS_BUILD_DIR
