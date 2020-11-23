@@ -125,6 +125,12 @@ else
 	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
 endif
 
+
+ifneq ($(CHROOT),)
+	CHROOT :=  $(shell echo $(CHROOT) | tr a-z A-Z)
+	ASFLAGS += -DROOT_DIR='"$(CHROOT)"'
+endif
+
 #
 # Définition des outils
 #

@@ -105,6 +105,7 @@
 ; #define BASIC_QUIT
 ; #define ROM_122
 ; #define FAST_LOAD
+; #define ROOT_DIR "/HOME/BASIC11"
 
 	;---------------------------------------------------------------------------
 	;				Défaut
@@ -113,10 +114,14 @@
 #define ORIX_CLI
 #define LOAD_CHARSET
 #define ORIX_SIGNATURE
+
 #define FORCE_ROOT_DIR
+#ifndef GAMES
+#ifndef ROOT_DIR
 #define ROOT_DIR "/HOME/BASIC11"
-;#define ROOT_DIR "/"
-;#define FAST_LOAD
+#endif
+#endif
+
 #define JOYSTICK_DEFAULT_CONF
 #undef AUTO_USB_MODE
 #undef MULTIPART_SAVE
@@ -136,7 +141,9 @@
 #undef ORIX_SIGNATURE
 ;#define FORCE_ROOT_DIR
 ;#define ROOT_DIR "/USR/SHARE/GAMES"
+#ifndef ROOT_DIR
 #define ROOT_DIR "/USR/SHARE/BASIC11"
+#endif
 ;#define FAST_LOAD
 #undef EXPERIMENTAL
 #undef ROM_122

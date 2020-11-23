@@ -11,39 +11,27 @@ addons:
         - python3-pip
         - python3-pycurl
 
-stages:
-    - test
-    - release
-
-jobs:
-    include:
-        - stage: test
-          if: branch != master
-          script:
-            - cd $TRAVIS_BUILD_DIR
-            - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make && make clean
-            - ROM122=yes make && make clean
-            - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make && make clean
-            - USB_MODE=usb ROM122=yes make && make clean
-
-        - stage: release
-          if: branch = master && type = cron
-          script:
-            - cd $TRAVIS_BUILD_DIR
-            - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make && make clean
-            - ROM122=yes make && make clean
-            - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make && make clean
-            - USB_MODE=usb ROM122=yes make && make clean
-            - cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
-
 
 install:
-    - pushd tools && git clone https://github.com/assinie/md2hlp.git
-    - popd
+    # - pushd tools && git clone https://github.com/assinie/md2hlp.git
+    # - popd
     - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
     - pushd xa65/xa && make &> /dev/null
     - cp file65 ldo65 reloc65 xa /home/travis/bin
     - popd
+
+
+script:
+    - cd $TRAVIS_BUILD_DIR
+    - echo "travis_fold:start:sd_roms"
+    - HOBBIT=yes make && make clean && GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && make && make clean
+    - ROM122=yes make && make clean
+    - echo "travis_fold:end:sd_roms"
+    - echo "travis_fold:start:usb_roms"
+    - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && USB_MODE=usb make && make clean
+    - USB_MODE=usb ROM122=yes make && make clean
+    - echo "travis_fold:end:usb_roms"
+
 
 after_success:
     - cd $TRAVIS_BUILD_DIR
@@ -61,3 +49,4 @@ after_success:
     - echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
     - cd orix && tar -zcvf ../basic.tgz *
     - cd $TRAVIS_BUILD_DIR
+    - curl -X POST --data-binary '@basic.tgz' "https://cdn.oric.org/publish.php?hash=$hash&path=/home/oricoujr/www/ftp/orix/dists/$VERSION/tgz/6502/basic.tgz"
