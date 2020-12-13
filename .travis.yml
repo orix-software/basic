@@ -23,14 +23,10 @@ install:
 
 script:
     - cd $TRAVIS_BUILD_DIR
-    - echo -e 'travis_fold:start:sd_roms\r\e[0K\e[33;1mSD ROMS\e[0m'
     - HOBBIT=yes make && make clean && GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && make && make clean
     - ROM122=yes make && make clean
-    - echo -en 'travis_fold:end:sd_roms\r\e[0K'
-    - echo -e 'travis_fold:start:usb_roms\r\e[0K\e[33;1mUSB ROMS\e[0m'
     - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && USB_MODE=usb make && make clean
     - USB_MODE=usb ROM122=yes make && make clean
-    - echo -en 'travis_fold:end:usb_roms\r\e[0K'
 
 
 after_success:
