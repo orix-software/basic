@@ -3,34 +3,36 @@ os: linux
 language: c
 
 addons:
-        apt:
-                update: true
-                packages:
-                        - curl
-                        - python3
-                        - python3-pip
-                        - python3-pycurl
+    apt:
+      update: true
+      packages:
+        - curl
+        - python3
+        - python3-pip
+        - python3-pycurl
+
 
 install:
-    - pushd tools && git clone https://github.com/assinie/md2hlp.git
-    - popd
+    # - pushd tools && git clone https://github.com/assinie/md2hlp.git
+    # - popd
     - git clone --branch xa-2.3.10 https://github.com/fachat/xa65.git
     - pushd xa65/xa && make &> /dev/null
     - cp file65 ldo65 reloc65 xa /home/travis/bin
     - popd
 
+
 script:
     - cd $TRAVIS_BUILD_DIR
-    - HOBBIT=yes make && make clean && GAMES=yes make && make clean && make && make clean
+    - HOBBIT=yes make && make clean && GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && make && make clean
     - ROM122=yes make && make clean
-    - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes make && make clean && USB_MODE=usb make && make clean
+    - USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && USB_MODE=usb make && make clean
     - USB_MODE=usb ROM122=yes make && make clean
-    - cd tools && python3 retrieveSoftwareOricOrg.py && ls ../ && ./builddocs.sh
+
 
 after_success:
     - cd $TRAVIS_BUILD_DIR
     - VERSION=`cat VERSION`
-    - mkdir -p orix/usr/share/basic11/$VERSION 
+    - mkdir -p orix/usr/share/basic11/$VERSION
     - mkdir -p orix/usr/share/basic11
     - mkdir -p orix/etc/orixcfg/$VERSION
     - cp build/cart/basic*.rom orix/usr/share/basic11/$VERSION/

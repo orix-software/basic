@@ -105,6 +105,7 @@
 ; #define BASIC_QUIT
 ; #define ROM_122
 ; #define FAST_LOAD
+; #define ROOT_DIR "/HOME/BASIC11"
 
 	;---------------------------------------------------------------------------
 	;				Défaut
@@ -113,10 +114,14 @@
 #define ORIX_CLI
 #define LOAD_CHARSET
 #define ORIX_SIGNATURE
+
 #define FORCE_ROOT_DIR
+#ifndef GAMES
+#ifndef ROOT_DIR
 #define ROOT_DIR "/HOME/BASIC11"
-;#define ROOT_DIR "/"
-;#define FAST_LOAD
+#endif
+#endif
+
 #define JOYSTICK_DEFAULT_CONF
 #undef AUTO_USB_MODE
 #undef MULTIPART_SAVE
@@ -136,7 +141,9 @@
 #undef ORIX_SIGNATURE
 ;#define FORCE_ROOT_DIR
 ;#define ROOT_DIR "/USR/SHARE/GAMES"
+#ifndef ROOT_DIR
 #define ROOT_DIR "/USR/SHARE/BASIC11"
+#endif
 ;#define FAST_LOAD
 #undef EXPERIMENTAL
 #undef ROM_122
@@ -1589,7 +1596,7 @@ RESET_VECTOR    = $fffc
 
 
 		;---------------------------------------------------------------------------
-		; open_fqn (107 octets -3)
+		; open_fqn (103 octets -3)
 		;---------------------------------------------------------------------------
 		; Ouvre un fichier (chemin absolu ou relatif sans ../)
 		; Les paramètres en entrée sont les mêmes que ceux en sortie de jsr CheckStr/ReleaseVarStr
@@ -1682,8 +1689,8 @@ RESET_VECTOR    = $fffc
 			; Remplacer BCC *+5/JMP ZZnnnnn par BCS ZZnnnnn
 										; WHILE PTR1+3 < PTR1+2
 		ZZ1005:
-			lda INTTMP+1
-			cmp INTTMP
+			ldy INTTMP+1
+			cpy INTTMP
 			;bcc  *+5
 			;jmp ZZ0006
 			bcs ZZ0006
@@ -1691,7 +1698,8 @@ RESET_VECTOR    = $fffc
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
 			; IF &PTR1[PTR1+3] = '/' THEN
 										; .Y = PTR1+3;
-			ldy INTTMP+1
+			; Optimisation
+			;ldy INTTMP+1
 										; .A = @PTR1[.Y];
 			lda (PTR1),Y
 			; Remplacer BEQ *+5/JMP ZZnnnnn par BNE ZZnnnnn
@@ -1720,15 +1728,16 @@ RESET_VECTOR    = $fffc
 ;			bcs  *+5
 ;			jmp ZZ0008
 ; Optimisation en inversant le test: Gain 5 Octets
-			lda INTTMP+1
-			cmp INTTMP
+			ldy INTTMP+1
+			cpy INTTMP
 			bcs ZZ0008
 
 			lda #$2F
 			sta CH376_COMMAND
 		ZZ0008:
 										; .Y = PTR1+3;
-			ldy INTTMP+1
+			; Optimisation
+			;ldy INTTMP+1
 										; .A = @PTR1[.Y];
 			lda (PTR1),Y
 										; END;
