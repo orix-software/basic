@@ -446,6 +446,11 @@ Reset           = $f88f
 
 RESET_VECTOR    = $fffc
 
+; Pour la copie du jeu de caractères ROM -> RAM
+LF982		= $f982
+ROMRAM_table	= $f992
+CopyMem		= $edc4
+
 ;---------------------------------------------------------------------------
 ;				CSAVE
 ;---------------------------------------------------------------------------
@@ -2680,6 +2685,22 @@ FACC5 = $00cb
 
 #endif
 
+#ifdef LOAD_CHARSET
+; ******************************************************************************
+; TRANSFERT POSSIBLE JUSTE AVANT CHROOT_PATH SI ON DECALE CHROOT_PATH DE 2 OCTETS
+		; Patch pour la copie du jeu de caractères ROM -> RAM
+		PATCH_LF982:
+		.(
+			ldy #$06
+			cpx #$05		; X=5 si copie du jeu de caractère
+			beq suite
+			jmp LF985
+
+		suite:
+			jmp load_charset
+		.)
+#endif
+
 CharSet_end:
 
 #if * > KeyCodeTab
@@ -3532,12 +3553,24 @@ CharSet_end:
 	; copier le jeu de caractères depuis la rom vers la ram.
 	; On suppose que l'Oric a déjà démarré et que le jeu est en place
 	; Charge un jeu decaractères depuis la carte SD/USB
-	new_patchl(LF8B8+26,3)
-;#ifdef FORCE_ROOT_DIR
-	jsr load_charset
-;#else
-;	jsr load_charset2
-;#endif
+
+; Original: Patch de la routine d'init
+;	new_patchl(LF8B8+26,3)
+;	jsr load_charset
+
+; Patch de la routine de copie de bloc(PATCH_LF982 teste X=5)
+#echo "Characters set init: load from file"
+	new_patch(LF982, LF992)
+	; LF982
+	jmp PATCH_LF982
+LF985:
+        lda     ROMRAM_table,x                  ; F985 BD 92 F9
+        sta     $0B,y                           ; F988 99 0B 00
+        dex                                     ; F98B CA
+        dey                                     ; F98C 88
+        bne     LF985                           ; F98D D0 F6
+        jmp     CopyMem                         ; F98F 20 C4 ED
+LF992:
 
 #endif
 
