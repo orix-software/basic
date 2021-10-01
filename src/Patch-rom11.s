@@ -3522,7 +3522,8 @@ CharSet_end:
 	; qui copie Charget et RND en RAM
 	new_patchl(LEC9C+17,7)
 		.byte $AF	; Fire 2 => [Enter]
-		.byte $A9	; Fire 3 => [Esc]
+		; .byte $A9	; Fire 3 => [Esc]
+		.byte $00	; Fire 3 => N/A (temporaire)
 		.byte $B4	; Down   => [Down_arrow]
 		.byte $BC	; Right  => [Right_arrow]
 		.byte $AC	; Left   => [Left_arrow]
