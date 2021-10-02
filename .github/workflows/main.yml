@@ -113,16 +113,48 @@ jobs:
       - name: Compile project
         run: |
           export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
+          echo "::group::Atmos roms"
+          echo "::group::sdcard roms"
+          echo "::group::Hobbit"
           HOBBIT=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::Games"
           GAMES=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::Normal"
           make && make clean
+          echo "::endgroup::"
+          echo "::group::version 1.22"
           ROM122=yes make && make clean
+          echo "::endgroup::"
+          echo "::endgroup::"
+          echo "::group::USB roms"
+          echo "::group::Hobbit"
           USB_MODE=usb HOBBIT=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::Games"
           USB_MODE=usb GAMES=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::Normal"
           USB_MODE=usb make && make clean
+          echo "::endgroup::"
+          echo "::group::version 1.22"
           USB_MODE=usb ROM122=yes make && make clean
+          echo "::endgroup::"
+          echo "::endgroup::"
+          echo "::endgroup::"
+          echo "::group::Oric-1 roms"
+          echo "::group::sdcard roms"
+          echo "::group::Normal"
           VERSION=100 make && VERSION=100 make clean
+          echo "::endgroup::"
+          echo "::endgroup::"
+          echo "::group::USB roms"
+          echo "::group::Normal"
           USB_MODE=usb VERSION=100 make && VERSION=100 make clean
+          echo "::endgroup::"
+          echo "::endgroup::"
+          echo "::endgroup::"
 
       - name: List build directory content
         run: ls -lR build
