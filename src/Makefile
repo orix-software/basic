@@ -250,7 +250,7 @@ configure:
 	@mkdir -p $(OBJPATH)
 	@mkdir -p $(ROMPATH)
 	@mkdir -p $(INCPATH)
-	@echo -e "; Build $(ROM)\n" > $(INCPATH)/build.inc
+	@echo "; Build $(ROM)\n" > $(INCPATH)/build.inc
 	@echo "; $(ASFLAGS)" >> $(INCPATH)/build.inc
 	@echo ".define COPYRIGHT_MSG \"$(COPYRIGHT_MSG)\"" | sed -re "s# /#/#g" >> $(INCPATH)/build.inc
 ifneq ($(CHROOT),)
@@ -260,7 +260,7 @@ endif
 ifneq ($(CHARSET),)
 	@echo ".define DEFAULT_CHARSET \"$(CHARSET)\"" >> $(INCPATH)/build.inc
 endif
-	@echo -e "\n$(OPTIONS)" >> $(INCPATH)/build.inc
+	@echo "\n$(OPTIONS)" >> $(INCPATH)/build.inc
 
 
 
