@@ -242,8 +242,8 @@ jobs:
           cp rom.110/*.rom orix/usr/share/basic11/$version
           cp rom.100/*.rom orix/usr/share/basic10
           cp rom.100/*.rom orix/usr/share/basic10/$version
-          cp pravetzt/*.rom orix/usr/share/pravetzt
-          cp pravetzt/*.rom orix/usr/share/pravetzt/$version
+          cp pravetzt.110/*.rom orix/usr/share/pravetzt
+          cp pravetzt.110/*.rom orix/usr/share/pravetzt/$version
           cp charset/* orix/usr/share/fonts
           echo "Basicsd Hobbit v$version sd;/usr/share/basic/$version/basicsd0.rom" > orix/etc/orixcfg/$version/basic.cnf
           echo "Basicsd Games v$version joy/sd;/usr/share/basic/$version/basicsd1.rom" >> orix/etc/orixcfg/$version/basic.cnf
