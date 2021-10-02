@@ -31,7 +31,9 @@
 	option ADD_ONERROR, OFF
 	option JOYSTICK_EXTERNAL_CONF, OFF
 
-        option FORCE_MULTIPART, OFF
+	option FORCE_MULTIPART, OFF
+
+	option PRAVETZT, OFF
 
 .include "build.inc"
 
@@ -39,29 +41,30 @@
 ;
 ;---------------------------------------------------------------------------
 .ifndef CONFIG
-        .out "Default to BASIC v1.1"
-        CONFIG .set 2
+	.out "Default to BASIC v1.1"
+	CONFIG .set 2
 .endif
 
 .if VERSION = 100
-        option JOYSTICK_DRIVER, ON
+	option JOYSTICK_DRIVER, ON
 	option JOYSTICK_EXTERNAL_CONF, ON
-        option ROM_122, OFF
-        option EXPERIMENTAL, OFF
+	option ROM_122, OFF
+	option EXPERIMENTAL, OFF
+	option PARTVETZT, OFF
 
 .else
-        .if CONFIG = 0
-                option HOBBIT, ON
+	.if CONFIG = 0
+		option HOBBIT, ON
 
-        .elseif CONFIG = 1
-                option GAMES, ON
+	.elseif CONFIG = 1
+		option GAMES, ON
 
-        .elseif CONFIG = 2
+	.elseif CONFIG = 2
 
-        .elseif CONFIG = 3
-                option ROM_122, ON
-                ; option EXPERIMENTAL, ON
-        .endif
+	.elseif CONFIG = 3
+		option ROM_122, ON
+		; option EXPERIMENTAL, ON
+	.endif
 .endif
 
 ;---------------------------------------------------------------------------
@@ -84,15 +87,21 @@
 	;			Message de Copyright
 	;---------------------------------------------------------------------------
 .if .not .match(COPYRIGHT_MSG, "COPYRIGHT_MSG")
-        .if VERSION = 100
-	        .define COPYRIGHT_MSG1 "ORIC EXTENDED BASIC V1.0",$0D,$0A
-	        .define COPYRIGHT_MSG2 $60," 1983 TANGERINE",$0D,$0A
-	        .define COPYRIGHT_MSG COPYRIGHT_MSG1 , COPYRIGHT_MSG2
-        .else
-	        .define COPYRIGHT_MSG1 "ORIC EXTENDED BASIC V1.1",$0D,$0A
-	        .define COPYRIGHT_MSG2 $60," 1983 TANGERINE",$0D,$0A
-	        .define COPYRIGHT_MSG COPYRIGHT_MSG1 , COPYRIGHT_MSG2
-        .endif
+	.if VERSION = 100
+		.define COPYRIGHT_MSG1 "ORIC EXTENDED BASIC V1.0",$0D,$0A
+		.define COPYRIGHT_MSG2 $60," 1983 TANGERINE",$0D,$0A
+		.define COPYRIGHT_MSG COPYRIGHT_MSG1 , COPYRIGHT_MSG2
+	.else
+		.if PRAVETZT = 0
+			.define COPYRIGHT_MSG1 "ORIC EXTENDED BASIC V1.1",$0D,$0A
+			.define COPYRIGHT_MSG2 $60," 1983 TANGERINE",$0D,$0A
+			.define COPYRIGHT_MSG COPYRIGHT_MSG1 , COPYRIGHT_MSG2
+		.else
+			.define COPYRIGHT_MSG1 "\x70\x72\x61\x77\x65\x63\x2d\x38\x64               \r\n"
+			.define COPYRIGHT_MSG2 "\x62\x72\x77 _ BASIC     \r\n"
+			.define COPYRIGHT_MSG COPYRIGHT_MSG1 , COPYRIGHT_MSG2
+		.endif
+	.endif
 .endif
 
 	;---------------------------------------------------------------------------
@@ -122,20 +131,24 @@ option ORIX_SIGNATURE, SET
 option FORCE_ROOT_DIR, SET
 
 .if .not GAMES
-        .if .not .match(ROOT_DIR, "ROOT_DIR")
-	        .if VERSION = 100
-		        .define ROOT_DIR "/HOME/BASIC10"
-	        .else
-		        .define ROOT_DIR "/HOME/BASIC11"
+	.if .not .match(ROOT_DIR, "ROOT_DIR")
+		.if VERSION = 100
+			.define ROOT_DIR "/HOME/BASIC10"
+		.else
+			.if PRAVETZT = 0
+				.define ROOT_DIR "/HOME/BASIC11"
+			.else
+				.define ROOT_DIR "/HOME/PRAVETZT"
+			.endif
 		.endif
 	.endif
 .endif
 
 
 .if JOYSTICK_DRIVER
-        option JOYSTICK_DEFAULT_CONF, SET
+	option JOYSTICK_DEFAULT_CONF, SET
 .else
-        option JOYSTICK_DEFAULT_CONF, OFF
+	option JOYSTICK_DEFAULT_CONF, OFF
 .endif
 
 option AUTO_USB_MODE, OFF
@@ -155,11 +168,15 @@ option VIA2_FAKE, SET
 	option ORIX_SIGNATURE, OFF
 	;.define FORCE_ROOT_DIR
 	;.define ROOT_DIR "/USR/SHARE/GAMES"
-        .if .not .match(ROOT_DIR, "ROOT_DIR")
-	        .if VERSION = 100
-		        .define ROOT_DIR "/USR/SHARE/BASIC10"
-	        .else
-		        .define ROOT_DIR "/USR/SHARE/BASIC11"
+	.if .not .match(ROOT_DIR, "ROOT_DIR")
+		.if VERSION = 100
+			.define ROOT_DIR "/USR/SHARE/BASIC10"
+		.else
+			.if PRAVETZT = 0
+				.define ROOT_DIR "/USR/SHARE/BASIC11"
+			.else
+				.define ROOT_DIR "/USR/SHARE/PRAVETZT"
+			.endif
 		.endif
 	.endif
 	;.define FAST_LOAD
@@ -243,11 +260,19 @@ display_color DEFAULT_PAPER
 	;---------------------------------------------------------------------------
 .if NO_CHARSET
 	.if LOAD_CHARSET
-                .if .not .match(DEFAULT_CHARSET, "DEFAULT_CHARSET")
+		.if .not .match(DEFAULT_CHARSET, "DEFAULT_CHARSET")
 			.if FORCE_ROOT_DIR
-				.define DEFAULT_CHARSET "/USR/SHARE/FONTS/DEFAULT.CHS"
+				.if PRAVETZT = 0
+					.define DEFAULT_CHARSET "/USR/SHARE/FONTS/DEFAULT.CHS"
+				.else
+					.define DEFAULT_CHARSET "/USR/SHARE/FONTS/PRAVETZT.CHS"
+				.endif
 			.else
-				.define DEFAULT_CHARSET .sprintf("%s/%s", ROOT_DIR, "DEFAULT.CHS")
+				.if PRAVETZT = 0
+					.define DEFAULT_CHARSET .sprintf("%s/%s", ROOT_DIR, "DEFAULT.CHS")
+				.else
+					.define DEFAULT_CHARSET .sprintf("%s/%s", ROOT_DIR, "PRAVETZT.CHS")
+				.endif
 			.endif
 		.endif
 		.out .sprintf("Default charset       : %s", DEFAULT_CHARSET)
@@ -356,9 +381,9 @@ fTextMode	= HIRES_flag			; 0:TEXT, 1:HIRES (pour DEF CHAR)
 ; Non utilisées par le BASIC
 ;---------------------------------------------------------------------------
 .if VERSION = 100
-        OPENFFLAG	= $0221			; Flag pour détecter si un fichier .tap a été ouvert (0: Fichier ouvert, 1: Fichier fermé)
+	OPENFFLAG	= $0221			; Flag pour détecter si un fichier .tap a été ouvert (0: Fichier ouvert, 1: Fichier fermé)
 .else
-        OPENFFLAG	= $020f			; Flag pour détecter si un fichier .tap a été ouvert (0: Fichier ouvert, 1: Fichier fermé)
+	OPENFFLAG	= $020f			; Flag pour détecter si un fichier .tap a été ouvert (0: Fichier ouvert, 1: Fichier fermé)
 .endif
 MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams a été appelé)
 

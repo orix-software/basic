@@ -110,51 +110,78 @@ jobs:
       - name: Prepare environment for project
         run: mv cc65 ../ && mv orix-software ../ && mv orix-sdk ../ && mv md2hlp ../
 
-      - name: Compile project
+      - name: Compile Atmos roms
         run: |
           export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
-          echo "::group::Atmos roms"
-          echo "::group::sdcard roms"
-          echo "::group::Hobbit"
+          echo "Atmos roms (sdcard)"
+          echo "::group::Hobbit (id=0)"
           HOBBIT=yes make && make clean
           echo "::endgroup::"
-          echo "::group::Games"
-          GAMES=yes make && make clean
+          echo "::group::Games (id=1)"
+          GAMES=yes CHROOT=/HOME/BASIC11 make && make clean
           echo "::endgroup::"
-          echo "::group::Normal"
+          echo "::group::Normal (id=2)"
           make && make clean
           echo "::endgroup::"
-          echo "::group::version 1.22"
+          echo "::group::version 1.22 (id=3)"
           ROM122=yes make && make clean
           echo "::endgroup::"
-          echo "::endgroup::"
-          echo "::group::USB roms"
-          echo "::group::Hobbit"
+          echo "Atmos roms (USB)"
+          echo "::group::Hobbit (id=0)"
           USB_MODE=usb HOBBIT=yes make && make clean
           echo "::endgroup::"
-          echo "::group::Games"
-          USB_MODE=usb GAMES=yes make && make clean
+          echo "::group::Games (id=1)"
+          USB_MODE=usb GAMES=yes CHROOT=/HOME/BASIC11 make && make clean
           echo "::endgroup::"
-          echo "::group::Normal"
+          echo "::group::Normal (id=2)"
           USB_MODE=usb make && make clean
           echo "::endgroup::"
-          echo "::group::version 1.22"
+          echo "::group::version 1.22 (id=3)"
           USB_MODE=usb ROM122=yes make && make clean
           echo "::endgroup::"
-          echo "::endgroup::"
-          echo "::endgroup::"
-          echo "::group::Oric-1 roms"
-          echo "::group::sdcard roms"
-          echo "::group::Normal"
+
+      - name: Compile Oric-1 roms
+        run: |
+          export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
+          echo "Oric-1 roms (sdcard)"
+          echo "::group::Normal (id=2)"
           VERSION=100 make && VERSION=100 make clean
           echo "::endgroup::"
-          echo "::endgroup::"
-          echo "::group::USB roms"
-          echo "::group::Normal"
+          echo "Oric-1 roms (USB)"
+          echo "::group::Normal (id=2)"
           USB_MODE=usb VERSION=100 make && VERSION=100 make clean
           echo "::endgroup::"
+
+      - name: Compile Pravetzt roms
+        run: |
+          export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
+          echo "Pravetzt roms (sdcard)"
+          echo "::group::Hobbit (id=0)"
+          HOBBIT=yes PRAVETZT=yes make && make clean
           echo "::endgroup::"
+          echo "::group::Games (id=1)"
+          GAMES=yes PRAVETZT=yes CHROOT=/HOME/PRAVETZT make && make clean
           echo "::endgroup::"
+          echo "::group::Normal (id=2)"
+          PRAVETZT=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::version 1.22 (id=3)"
+          ROM122=yes PRAVETZT=yes make && make clean
+          echo "::endgroup::"
+          echo "Pravetzt roms (USB)"
+          echo "::group::Hobbit (id=0)"
+          USB_MODE=usb HOBBIT=yes PRAVETZT=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::Games (id=1)"
+          USB_MODE=usb GAMES=yes PRAVETZT=yes CHROOT=/HOME/PRAVETZT make && make clean
+          echo "::endgroup::"
+          echo "::group::Normal (id=2)"
+          USB_MODE=usb PRAVETZT=yes make && make clean
+          echo "::endgroup::"
+          echo "::group::version 1.22 (id=3)"
+          USB_MODE=usb ROM122=yes PRAVETZT=yes make && make clean
+          echo "::endgroup::"
+          mkdir build/charset && cp src/charset/*CHS build/charset
 
       - name: List build directory content
         run: ls -lR build
@@ -209,10 +236,15 @@ jobs:
           mkdir -p orix/etc/orixcfg/$version
           mkdir -p orix/usr/share/basic11/$version
           mkdir -p orix/usr/share/basic10/$version
+          mkdir -p orix/usr/share/pravetzt/$version
+          mkdir -p orix/usr/share/fonts
           cp rom.110/*.rom orix/usr/share/basic11
           cp rom.110/*.rom orix/usr/share/basic11/$version
           cp rom.100/*.rom orix/usr/share/basic10
           cp rom.100/*.rom orix/usr/share/basic10/$version
+          cp pravetzt/*.rom orix/usr/share/pravetzt
+          cp pravetzt/*.rom orix/usr/share/pravetzt/$version
+          cp charset/* orix/usr/share/fonts
           echo "Basicsd Hobbit v$version sd;/usr/share/basic/$version/basicsd0.rom" > orix/etc/orixcfg/$version/basic.cnf
           echo "Basicsd Games v$version joy/sd;/usr/share/basic/$version/basicsd1.rom" >> orix/etc/orixcfg/$version/basic.cnf
           echo "Basicsd v$version joy/sd;/usr/share/basic/$version/basicsd2.rom" >> orix/etc/orixcfg/$version/basic.cnf

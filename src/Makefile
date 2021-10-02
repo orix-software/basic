@@ -3,10 +3,6 @@
 #
 
 PROJECT = basic
-BUILDPATH = ../build
-OBJPATH = $(BUILDPATH)/obj
-ROMPATH = $(BUILDPATH)/rom
-INCPATH = $(BUILDPATH)/include
 
 USB_MODE ?= sdcard
 BACK_TO_ORIX ?= yes
@@ -20,6 +16,11 @@ VERSION ?= 110
 # %<-------------------------------------------------------------------------->%
 #               Ne rien modifier au dela de cette ligne
 #
+
+BUILDPATH = ../build
+OBJPATH = $(BUILDPATH)/obj
+ROMPATH = $(BUILDPATH)/rom
+INCPATH = $(BUILDPATH)/include
 
 # Sur Ubuntu, le shell par défaut est dash et non bash
 # et l'option -e de echo n'est pas reconnue
@@ -73,6 +74,7 @@ endif
 
 ifneq ($(PRAVETZT),)
 	VERSION = 110
+	ROMPATH := $(BUILDPATH)/pravetzt
 endif
 
 ROMPATH := $(ROMPATH).$(VERSION)
@@ -94,28 +96,47 @@ endif
 #COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
 
 ifeq ($(HOBBIT),yes)
-	COPYRIGHT_MSG_AUTO = "Hobbit BASIC 1.1"
+	ifeq ($(PRAVETZT),)
+		COPYRIGHT_MSG_AUTO = "Hobbit BASIC 1.1"
+	else
+		COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nHOBBIT"
+	endif
+
 	OPTIONS += "option HOBBIT, yes\\n"
 	ROMID := 0
 	JOYSTICK = no
 	EXPERIMENTAL = no
 else
 	ifeq ($(GAMES),yes)
-		COPYRIGHT_MSG_AUTO = "Games BASIC 1.1"
+		ifeq ($(PRAVETZT),)
+			COPYRIGHT_MSG_AUTO = "Games BASIC 1.1"
+		else
+			COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nGAMES"
+		endif
+
 		OPTIONS += "option GAMES, yes\\n"
 		ROMID := 1
 		JOYSTICK = yes
 		EXPERIMENTAL = no
 	else
 		ifeq ($(ROM122),yes)
-			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.2"
+			ifeq ($(PRAVETZT),)
+				COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.2"
+			else
+				COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nBASIC 1.2"
+			endif
+
 			OPTIONS += "option ROM_122, yes\\n"
 			ROMID := 3
 		else
 			ifeq ($(VERSION),100)
 				COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.0"
 			else
-				COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+				ifeq ($(PRAVETZT),)
+					COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+				else
+					COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nBASIC"
+				endif
 			endif
 			ROMID := 2
 		endif
@@ -130,11 +151,22 @@ OPTIONS += "CONFIG .set $(ROMID)\\n"
 #
 
 ifeq ($(USB_MODE),sdcard)
-	PROJECT = basicsd$(ROMID)
+	ifeq ($(PRAVETZT),)
+		PROJECT = basicsd$(ROMID)
+	else
+		PROJECT = pravsd$(ROMID)
+	endif
+
 	COPYRIGHT_MSG_AUTO += "SD"
 	OPTIONS += "CH376_USB_MODE .set SDCARD_MODE\\n"
+
 else
-	PROJECT = basicus$(ROMID)
+	ifeq ($(PRAVETZT),)
+		PROJECT = basicus$(ROMID)
+	else
+		PROJECT = pravus$(ROMID)
+	endif
+
 	COPYRIGHT_MSG_AUTO += "USB"
 	OPTIONS += "CH376_USB_MODE .set USB_HOST_MODE\\n"
 endif
@@ -241,7 +273,7 @@ symbols: $(ROMPATH)/$(PROJECT).sym
 help:
 	@echo
 	@echo 'Targets'
-	@echo -e '\t- all: Patch BASIC 1.1 ROM with CH376 support'
+	@echo -e '\t- all: Patch BASIC 1.x ROM with CH376 support'
 	@echo
 	@echo -e '\t- symbols: Create symbols file for use with Oricutron'
 	@echo
@@ -267,6 +299,9 @@ ifneq ($(CHARSET),)
 endif
 	@echo -e "\n$(OPTIONS)" >> $(INCPATH)/build.inc
 
+ifneq ($(PRAVETZT),)
+	@echo "option PRAVETZT, yes" >> $(INCPATH)/build.inc
+endif
 
 
 clean:
