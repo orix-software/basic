@@ -70,6 +70,7 @@ ifneq ($(PRAVETZT),)
 	VERSION = 110
 endif
 
+ROMPATH := $(ROMPATH).$(VERSION)
 
 #
 # Définition de la date du build
