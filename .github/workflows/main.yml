@@ -191,12 +191,12 @@ jobs:
           cp rom.110/*.rom orix/usr/share/basic11/$version
           cp rom.100/*.rom orix/usr/share/basic10
           cp rom.100/*.rom orix/usr/share/basic10/$version
-          echo "Basicsd Hobbit v$VERSION sd;/usr/share/basic/$VERSION/basicsd0.rom" > orix/etc/orixcfg/$VERSION/basic.cnf
-          echo "Basicsd Games v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-          echo "Basicsd v$VERSION joy/sd;/usr/share/basic/$VERSION/basicsd2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-          echo "Basicusb Hobbit v$VERSION usb;/usr/share/basic/$VERSION/basicus0.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-          echo "Basicusb Games v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus1.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
-          echo "Basicusb v$VERSION joy/usb;/usr/share/basic/$VERSION/basicus2.rom" >> orix/etc/orixcfg/$VERSION/basic.cnf
+          echo "Basicsd Hobbit v$version sd;/usr/share/basic/$version/basicsd0.rom" > orix/etc/orixcfg/$version/basic.cnf
+          echo "Basicsd Games v$version joy/sd;/usr/share/basic/$version/basicsd1.rom" >> orix/etc/orixcfg/$version/basic.cnf
+          echo "Basicsd v$version joy/sd;/usr/share/basic/$version/basicsd2.rom" >> orix/etc/orixcfg/$version/basic.cnf
+          echo "Basicusb Hobbit v$version usb;/usr/share/basic/$version/basicus0.rom" >> orix/etc/orixcfg/$version/basic.cnf
+          echo "Basicusb Games v$version joy/usb;/usr/share/basic/$version/basicus1.rom" >> orix/etc/orixcfg/$version/basic.cnf
+          echo "Basicusb v$version joy/usb;/usr/share/basic/$version/basicus2.rom" >> orix/etc/orixcfg/$version/basic.cnf
           cd orix && tar -zcvf $GITHUB_WORKSPACE/$ARCHIVE_NAME *
 
       - name: Upload to oric
