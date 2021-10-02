@@ -21,6 +21,11 @@ VERSION ?= 110
 #               Ne rien modifier au dela de cette ligne
 #
 
+# Sur Ubuntu, le shell par défaut est dash et non bash
+# et l'option -e de echo n'est pas reconnue
+# on peut aussi spécifier /bin/echo au lieu de simplement echo
+SHELL = /bin/bash
+
 #
 # Définition des outils
 #
@@ -241,7 +246,7 @@ help:
 	@echo -e '\t- symbols: Create symbols file for use with Oricutron'
 	@echo
 	@echo "NOTE: need $(AS) assembler, python"
-	@echo -e '\n'
+	@echo
 
 
 configure:
@@ -250,7 +255,7 @@ configure:
 	@mkdir -p $(OBJPATH)
 	@mkdir -p $(ROMPATH)
 	@mkdir -p $(INCPATH)
-	@echo "; Build $(ROM)\n" > $(INCPATH)/build.inc
+	@echo "; Build $(ROM)" > $(INCPATH)/build.inc
 	@echo "; $(ASFLAGS)" >> $(INCPATH)/build.inc
 	@echo ".define COPYRIGHT_MSG \"$(COPYRIGHT_MSG)\"" | sed -re "s# /#/#g" >> $(INCPATH)/build.inc
 ifneq ($(CHROOT),)
@@ -260,7 +265,7 @@ endif
 ifneq ($(CHARSET),)
 	@echo ".define DEFAULT_CHARSET \"$(CHARSET)\"" >> $(INCPATH)/build.inc
 endif
-	@echo "\n$(OPTIONS)" >> $(INCPATH)/build.inc
+	@echo -e "\n$(OPTIONS)" >> $(INCPATH)/build.inc
 
 
 
