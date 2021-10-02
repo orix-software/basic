@@ -113,12 +113,26 @@ jobs:
       - name: Compile project
         run: |
           export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
-          HOBBIT=yes make && cat build/include/build.inc && make clean && GAMES=yes make && make clean && make && make clean
+          HOBBIT=yes make && make clean
+          cat build/include/build.inc
+          GAMES=yes make && make clean
+          cat build/include/build.inc
+          make && make clean
+          cat build/include/build.inc
           ROM122=yes make && make clean
-          USB_MODE=usb HOBBIT=yes make && make clean && USB_MODE=usb GAMES=yes CHROOT=/HOME/BASIC11 make && make clean && USB_MODE=usb make && make clean
+          cat build/include/build.inc
+          USB_MODE=usb HOBBIT=yes make && make clean
+          cat build/include/build.inc
+          USB_MODE=usb GAMES=yes make && make clean
+          cat build/include/build.inc
+          USB_MODE=usb make && make clean
+          cat build/include/build.inc
           USB_MODE=usb ROM122=yes make && make clean
+          cat build/include/build.inc
           VERSION=100 make && VERSION=100 make clean
+          cat build/include/build.inc
           USB_MODE=usb VERSION=100 make && VERSION=100 make clean
+          cat build/include/build.inc
 
       - name: List build directory content
         run: ls -lR build
