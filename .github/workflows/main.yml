@@ -88,7 +88,7 @@ jobs:
       run:
         shell: bash
     env:
-      CC65_HOME: ${{ ${GITHUB_WORKSPACE}/../cc65 }}
+      CC65_HOME: '${{ github.workspace }}/../cc65'
     outputs:
       version: ${{ steps.job_vars.outputs.VERSION }}
       repo_name: ${{ steps.job_vars.outputs.REPO_NAME }}
@@ -117,8 +117,7 @@ jobs:
 
       - name: Compile Atmos roms
         run: |
-          env
-          echo -e "\e[32;1mAtmos roms (sdcard)\e[0m"
+          echo "Atmos roms (sdcard)"
           echo "::group::Hobbit (id=0)"
           HOBBIT=yes make && make clean
           echo "::endgroup::"
@@ -147,6 +146,7 @@ jobs:
 
       - name: Compile Oric-1 roms
         run: |
+          export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
           echo "Oric-1 roms (sdcard)"
           echo "::group::Normal (id=2)"
           VERSION=100 make && VERSION=100 make clean
@@ -158,6 +158,7 @@ jobs:
 
       - name: Compile Pravetzt roms
         run: |
+          export CC65_HOME=${GITHUB_WORKSPACE}/../cc65
           echo "Pravetzt roms (sdcard)"
           echo "::group::Hobbit (id=0)"
           HOBBIT=yes PRAVETZT=yes make && make clean
