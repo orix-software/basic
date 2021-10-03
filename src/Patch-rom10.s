@@ -49,6 +49,24 @@ MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams 
 
 
 ;---------------------------------------------------------------------------
+; Déplacement du CLI APRES l'initialisation des vecteurs en ram
+;---------------------------------------------------------------------------
+.out "    Bug: initialisaton des vecteurs"
+	new_patchl Reset+3,13
+			;ldx	#$FF
+			;txs
+			;cli
+			cld
+			ldx	#$08
+		LF851:
+			lda	$F841,x
+			sta	IRQ_hook,x
+			dex
+			bpl	LF851
+			cli			; Correction
+
+
+;---------------------------------------------------------------------------
 ;			Personnalisation de la ROM
 ;---------------------------------------------------------------------------
 	;---------------------------------------------------------------------------

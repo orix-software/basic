@@ -86,7 +86,11 @@ ROMPATH := $(ROMPATH).$(VERSION)
 ifeq ($(GIT_BRANCH),master)
 	BUILD_DATE :=
 else
-	BUILD_DATE := $(shell date +" %d/%m %H:%M")
+	ifeq ($(PRAVETZT),)
+		BUILD_DATE := $(shell date +" %d/%m %H:%M")
+	else
+		BUILD_DATE := $(shell date +" %d/%m %H%M")
+	endif
 endif
 
 
@@ -244,7 +248,7 @@ all: configure $(ROMPATH)/$(ROM)
 
 $(OBJPATH)/%.o: %.s
 	@echo "Assemble patch file"
-	@$(CL) -t none --asm-include-dir $(INCPATH) -Wa "$(ASFLAGS)" -o $@ -l $(OBJPATH)/$*.lbl $<
+	@$(CL) -t none --asm-include-dir $(INCPATH) -Wa "$(ASFLAGS)" -o $@ -g -Ln $(OBJPATH)/$*.lbl $<
 
 
 $(ROMPATH)/$(ROM): $(OBJPATH)/$(OBJ)
@@ -254,7 +258,7 @@ $(ROMPATH)/$(ROM): $(OBJPATH)/$(OBJ)
 
 
 %.sym: %.lbl
-	@cut -d, -f1-2 $< | sed -re 's/([^,]+), 0x(.+)$$/\2 \1/' | sort > $@
+	@cut -d' ' -f2-3  $< | sed -re 's/00([^ ]+) \.(.+)$$/\L\1\E \2/' | grep -v '__' | sort > $@
 
 
 $(ROMPATH)/$(PROJECT).sym: $(OBJPATH)/$(SYM)
@@ -262,6 +266,10 @@ $(ROMPATH)/$(PROJECT).sym: $(OBJPATH)/$(SYM)
 	@echo "Create symbols file"
 	@cat $(PATCHROM).sym $^ | sort | uniq > $@
 
+
+#
+#
+#
 
 symbols: $(ROMPATH)/$(PROJECT).sym
 
@@ -281,6 +289,10 @@ help:
 	@echo
 
 
+#
+#
+#
+
 configure:
 	@echo
 	@mkdir -p $(BUILDPATH)
@@ -290,6 +302,7 @@ configure:
 	@echo "; Build $(ROM)" > $(INCPATH)/build.inc
 	@echo "; $(ASFLAGS)" >> $(INCPATH)/build.inc
 	@echo ".define COPYRIGHT_MSG \"$(COPYRIGHT_MSG)\"" | sed -re "s# /#/#g" >> $(INCPATH)/build.inc
+
 ifneq ($(CHROOT),)
 	@echo ".define ROOT_DIR \"$(CHROOT)\"" >> $(INCPATH)/build.inc
 endif
@@ -304,9 +317,17 @@ ifneq ($(PRAVETZT),)
 endif
 
 
+#
+#
+#
+
 clean:
 	cd $(OBJPATH) && rm -f $(OBJ) $(LBL)
 
+
+#
+#
+#
 
 mrproper: clean
 	cd $(ROMPATH) && rm -f $(ROM) $(SYM)
