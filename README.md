@@ -1,15 +1,16 @@
-[![Build Status](https://travis-ci.org/orix-software/basic.svg?branch=master)](https://travis-ci.org/orix-software/basic)
+[![build](https://github.com/orix-software/basic/actions/workflows/main.yml/badge.svg)](https://github.com/orix-software/basic/actions/workflows/main.yml)
 
 # Description
-BASIC cartridge for Orix with ch376 support
+BASIC cartridges for Orix with ch376 support
 
-- Based on BASIC v1.1 (Atmos version)
+- Based on BASIC v1.1 (Atmos and Pravetzt version), BASIC v1.0 (Oric-1 version)
 - Patch CSAVE/CLOAD/STORE/RECALL to use ch376 instead of tapes
+- Add QUIT instruction to go back to Orix
 
 ## Directories
 - docs: Documentation
 - src : Source files
-- original: Original ROM image
+- original: Original ROM images
 
 ## Informations (french)
 
@@ -64,13 +65,13 @@ Joystick:
     version of db : 1 byte
     id of the rom : 1 byte
     fire2_joy : 1 byte
-    fire3_joy : 1 byte            
+    fire3_joy : 1 byte
     down_joy : 1 byte
     right_joy : 1 byte
     left_joy : 1 byte
     fire1_joy : 1 byte
     up_joy : 1 byte
-    length of name_software = 1 byte length 
+    length of name_software = 1 byte length
     name_software_bin = X bytes X equals to previous byte
     end of string : 1 bytes (value : 0)
 

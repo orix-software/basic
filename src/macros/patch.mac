@@ -1,0 +1,90 @@
+.ifndef PATCH_MAC
+	;---------------------------------------------------------------------------
+	;				MACROS
+	;---------------------------------------------------------------------------
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	.macro string80 arg
+		; Place la chaine avec le bit7 du dernier caratère à 1
+	 	.repeat .strlen(arg)-1, I
+			.byte .strat(arg,I)
+		.endrepeat
+		.byte .strat(arg,.strlen(arg)-1) ^ $80
+	.endmacro
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	;.define new_patch(a,f) *=a-4 : .word a : .word (f-a)
+	.macro new_patch address, last
+		.out .sprintf("Add patch: %s", .string(address))
+		* = address-4
+		.word address
+		.word (.ident(.string(last))-address)
+	.endmacro
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	;.define new_patchl(a,l) *=a-4 : .word a : .word l
+	.macro new_patchl address, len
+		* = address-4
+		.word address
+		.word len
+	.endmacro
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	.macro assert_address msg, address
+		.if * > address
+			.error .sprintf("*** ERROR '%s' too long: $%X (+%d)", msg, *, *-(address))
+		.elseif * < address
+			.out .sprintf("\t*** NOTE '%s' $%X (-%d)", msg, *, (address)-*)
+		.endif
+	.endmacro
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	.macro option name, value
+		.if .xmatch(value, SET) .or .xmatch(value, set) .or .xmatch(value, ON) .or .xmatch(value, on) .or .xmatch(value, YES) .or .xmatch(value, yes)
+			;.out .sprintf("%22s: ON", .string(name))
+			name .set 1
+		.else
+			;.out .sprintf("%22s: OFF", .string(name))
+			name .set 0
+		.endif
+	.endmacro
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	.macro display_options arg
+		.repeat .tcount(arg), I
+			.out .sprintf("%22s: %s", .string(.mid(I, 1, arg)), .string(.mid(.mid(I, 1, arg) , 1, {OFF ON})) )
+		.endrep
+	.endmacro
+
+		;-------------------------------------------------------------------
+		;
+		;-------------------------------------------------------------------
+	.macro display_color arg
+		.out .sprintf("%22s: %s", .string(arg), .string(.mid(arg,1,{BLACK RED GREEN YELLOW BLUE PURPLE CYAN WHITE})))
+	.endmacro
+
+	; cas: ca65 -D CH376_USB_MODE=xx
+	.ifconst CH376_USB_MODE
+		.out .sprintf("%d",CH376_USB_MODE)
+		TOTO .set CH376_USB_MODE
+		.out .sprintf("%d",TOTO)
+	.endif
+
+	.ifdef CH376_USB_MODE
+		.out "CH376_USB_MODE: défini"
+	.endif
+
+	PATCH_MAC = 1
+.endif

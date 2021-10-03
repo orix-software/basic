@@ -2,8 +2,7 @@
 # Spécifique au Projet
 #
 
-PROJECT = basicsd
-BUILDPATH = ../build/cart
+PROJECT = basic
 
 USB_MODE ?= sdcard
 BACK_TO_ORIX ?= yes
@@ -12,19 +11,87 @@ EXPERIMENTAL ?= no
 ROM122 ?= no
 FAST ?= yes
 
+VERSION ?= 110
+
 # %<-------------------------------------------------------------------------->%
 #               Ne rien modifier au dela de cette ligne
 #
 
+BUILDPATH = ../build
+OBJPATH = $(BUILDPATH)/obj
+ROMPATH = $(BUILDPATH)/rom
+INCPATH = $(BUILDPATH)/include
+
+# Sur Ubuntu, le shell par défaut est dash et non bash
+# et l'option -e de echo n'est pas reconnue
+# on peut aussi spécifier /bin/echo au lieu de simplement echo
+SHELL = /bin/bash
+
+#
+# Définition des outils
+#
+
+ifeq ($(CC65_HOME),)
+	CC = cc65
+	AS = ca65
+	LD = ld65
+	AR = ar65
+	CL = cl65
+else
+	CC = $(CC65_HOME)/bin/cc65
+	AS = $(CC65_HOME)/bin/ca65
+	LD = $(CC65_HOME)/bin/ld65
+	AR = $(CC65_HOME)/bin/ar65
+	CL = $(CC65_HOME)/bin/cl65
+endif
+
+
+#
+# Définition des options pour les outils
+#
 
 PROJECT_VERSION := $(shell cat ../VERSION 2>/dev/null)
+
+ASFLAGS += -DVERSION=$(VERSION)
+
+PATCH = ./patch.py
+
+
+ifeq ($(VERSION),100)
+	HOBBIT = no
+	GAMES = no
+	PATCHROM := ../original/basic10
+	SRC = Patch-rom10.s
+else
+	ifneq ($(PRAVETZT),)
+		PATCHROM := ../original/pravetzt
+	else
+		PATCHROM := ../original/basic11b
+	endif
+	SRC = Patch-rom11.s
+endif
+
+
+ifneq ($(PRAVETZT),)
+	VERSION = 110
+	ROMPATH := $(BUILDPATH)/pravetzt
+endif
+
+ROMPATH := $(ROMPATH).$(VERSION)
+
+#
+# Définition de la date du build
+#
 
 ifeq ($(GIT_BRANCH),master)
 	BUILD_DATE :=
 else
-	BUILD_DATE := $(shell date +" %d/%m %H:%M")
+	ifeq ($(PRAVETZT),)
+		BUILD_DATE := $(shell date +" %d/%m %H:%M")
+	else
+		BUILD_DATE := $(shell date +" %d/%m")
+	endif
 endif
-
 
 
 #
@@ -33,120 +100,136 @@ endif
 #COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
 
 ifeq ($(HOBBIT),yes)
-	COPYRIGHT_MSG_AUTO = "Hobbit BASIC 1.1"
-	ASFLAGS += -DHOBBIT=yes
+	ifeq ($(PRAVETZT),)
+		COPYRIGHT_MSG_AUTO = "Hobbit BASIC 1.1"
+	else
+		COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nHOBBIT"
+	endif
+
+	OPTIONS += "option HOBBIT, yes\\n"
 	ROMID := 0
 	JOYSTICK = no
 	EXPERIMENTAL = no
 else
 	ifeq ($(GAMES),yes)
-		COPYRIGHT_MSG_AUTO = "Games BASIC 1.1"
-		ASFLAGS += -DGAMES=yes
+		ifeq ($(PRAVETZT),)
+			COPYRIGHT_MSG_AUTO = "Games BASIC 1.1"
+		else
+			COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nGAMES"
+		endif
+
+		OPTIONS += "option GAMES, yes\\n"
 		ROMID := 1
 		JOYSTICK = yes
 		EXPERIMENTAL = no
 	else
 		ifeq ($(ROM122),yes)
-			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.2"
-			ASFLAGS += -DROM_122=yes
-			# ROMID := 3
+			ifeq ($(PRAVETZT),)
+				COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.2"
+			else
+				COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nBASIC 1.2"
+			endif
+
+			OPTIONS += "option ROM_122, yes\\n"
+			ROMID := 3
 		else
-			COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+			ifeq ($(VERSION),100)
+				COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.0"
+			else
+				ifeq ($(PRAVETZT),)
+					COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1"
+				else
+					COPYRIGHT_MSG_AUTO = "\x70\x72\x61\x77\x65\x63\x2d\x38\x64\r\nBASIC"
+				endif
+			endif
 			ROMID := 2
 		endif
 	endif
 endif
+
+OPTIONS += "CONFIG .set $(ROMID)\\n"
+
 
 #
 # Sélection du type de carte (usb_host / sdcard)
 #
 
 ifeq ($(USB_MODE),sdcard)
-	PROJECT = basicsd$(ROMID)
-	# COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1 SD v$(PROJECT_VERSION)"
-	COPYRIGHT_MSG_AUTO += ," SD"
-	ASFLAGS += -DCH376_USB_MODE=3
+	ifeq ($(PRAVETZT),)
+		PROJECT = basicsd$(ROMID)
+	else
+		PROJECT = pravsd$(ROMID)
+	endif
+
+	COPYRIGHT_MSG_AUTO += "SD"
+	OPTIONS += "CH376_USB_MODE .set SDCARD_MODE\\n"
+
 else
-	PROJECT = basicus$(ROMID)
-	# COPYRIGHT_MSG_AUTO = "ORIC BASIC 1.1 USB v$(PROJECT_VERSION)"
-	COPYRIGHT_MSG_AUTO += ," USB"
-	ASFLAGS += -DCH376_USB_MODE=6
+	ifeq ($(PRAVETZT),)
+		PROJECT = basicus$(ROMID)
+	else
+		PROJECT = pravus$(ROMID)
+	endif
+
+	COPYRIGHT_MSG_AUTO += "USB"
+	OPTIONS += "CH376_USB_MODE .set USB_HOST_MODE\\n"
 endif
+
 
 #
 # Personnalisations diverses
 #
 ifneq ($(INK),)
-	ASFLAGS += -DDEFAULT_INK=$(INK)
+	OPTIONS += "DEFAULT_INK = $(INK)\\n"
 endif
 
 ifneq ($(PAPER),)
-	ASFLAGS += -DDEFAULT_PAPER=$(PAPER)
+	OPTIONS += "DEFAULT_PAPER = $(PAPER)\\n"
 endif
 
 
 
 ifeq ($(JOYSTICK),yes)
-	COPYRIGHT_MSG_AUTO += ,"/JOY"
-	ASFLAGS += -DJOYSTICK_DRIVER
+	COPYRIGHT_MSG_AUTO += "/JOY"
+	OPTIONS += "option JOYSTICK_DRIVER, yes\\n"
 endif
 
 
 ifeq ($(FAST),yes)
-	COPYRIGHT_MSG_AUTO += ,"/F"
-	ASFLAGS += -DFAST_LOAD
+	COPYRIGHT_MSG_AUTO += "/F"
+	OPTIONS += "option FAST_LOAD, yes\\n"
 endif
 
 
 ifeq ($(BACK_TO_ORIX),yes)
-	ASFLAGS += -DBASIC_QUIT
+	OPTIONS += "option BASIC_QUIT, yes\\n"
 endif
 
 
 
 ifneq ($(CHARSET),)
-	CHARSET :=  $(shell echo $(CHARSET) | tr a-z A-Z)
-	ASFLAGS += -DDEFAULT_CHARSET='"/USR/SHARE/FONTS/$(CHARSET)"'
+	CHARSET :=  $(shell echo "/USR/SHARE/FONTS/"$(CHARSET) | tr a-z A-Z)
 endif
 
 
 
 ifeq ($(EXPERIMENTAL),yes)
-	ASFLAGS += -DEXPERIMENTAL
-	COPYRIGHT_MSG_AUTO += ,"/E"
+	OPTIONS += "option EXPERIMENTAL, yes\\n"
+	COPYRIGHT_MSG_AUTO += "/E"
 endif
 
 
 
 ifneq ($(COPYRIGHT_MSG),)
-	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
+	#ASFLAGS +=,-DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
 else
-	COPYRIGHT_MSG = $(COPYRIGHT_MSG_AUTO), " v$(PROJECT_VERSION)$(BUILD_DATE)"
-	ASFLAGS += -DCOPYRIGHT_MSG='$(COPYRIGHT_MSG)'
+	COPYRIGHT_MSG = "$(COPYRIGHT_MSG_AUTO) v$(PROJECT_VERSION)$(BUILD_DATE)"
 endif
 
 
 ifneq ($(CHROOT),)
 	CHROOT :=  $(shell echo $(CHROOT) | tr a-z A-Z)
-	ASFLAGS += -DROOT_DIR='"$(CHROOT)"'
 endif
-
-#
-# Définition des outils
-#
-
-# Ne pas utiliser le flag -M avec la version OSDK de xa,
-# il n'est pas correctement géré...
-AS = xa
-ifeq ($(shell $(AS) --version 2>/dev/null),)
-	OSDK_FOUND = 1
-else
-	# La version officielle nécessite le flag -M à cause de ':' dans les commentaires
-	ASFLAGS += -M
-endif
-
-PATCH = ./patch.py
-PATCHFLAGS = --rom ../original/basic11b.rom
 
 #
 # Règles Make
@@ -154,35 +237,41 @@ PATCHFLAGS = --rom ../original/basic11b.rom
 
 .PHONY = configure symbols help clean mrproper
 
-SRC = $(wildcard *.s)
+# SRC = $(wildcard *.s)
 OBJ = $(SRC:.s=.o)
 ROM = $(PROJECT).rom
 LBL = $(SRC:.s=.lbl)
 SYM = $(LBL:.lbl=.sym)
 
-all: configure $(BUILDPATH)/$(ROM)
+all: configure $(ROMPATH)/$(ROM)
 
 
-$(BUILDPATH)/%.o: %.s
+$(OBJPATH)/%.o: %.s
 	@echo "Assemble patch file"
-	@$(AS) $(ASFLAGS) -o $@ -l $(BUILDPATH)/$*.lbl $<
+	@$(CL) -t none --asm-include-dir $(INCPATH) -Wa "$(ASFLAGS)" -o $@ -g -Ln $(OBJPATH)/$*.lbl $<
 
 
-$(BUILDPATH)/$(ROM): $(BUILDPATH)/$(OBJ)
-	@echo "Create $(ROM) - $(COPYRIGHT_MSG)"
-	@$(PATCH) $(PATCHFLAGS) -p $< -o $@
+$(ROMPATH)/$(ROM): $(OBJPATH)/$(OBJ)
+	@echo
+	@echo "Create $(ROM) - $(COPYRIGHT_MSG)" |sed -re "s# /#/#g"
+	@$(PATCH) --rom $(PATCHROM).rom -p $< -o $@
 
 
 %.sym: %.lbl
-	@cut -d, -f1-2 $< | sed -re 's/([^,]+), 0x(.+)$$/\2 \1/' | sort > $@
+	@cut -d' ' -f2-3  $< | sed -re 's/00([^ ]+) \.(.+)$$/\L\1\E \2/' | grep -v '__' | sort > $@
 
 
-$(BUILDPATH)/$(PROJECT).sym: $(BUILDPATH)/$(SYM)
+$(ROMPATH)/$(PROJECT).sym: $(OBJPATH)/$(SYM)
+	@echo
 	@echo "Create symbols file"
-	@cat ../original/basic11b.sym $^ | sort | uniq > $@
+	@cat $(PATCHROM).sym $^ | sort | uniq > $@
 
 
-symbols: $(BUILDPATH)/$(PROJECT).sym
+#
+#
+#
+
+symbols: $(ROMPATH)/$(PROJECT).sym
 
 
 #
@@ -192,26 +281,53 @@ symbols: $(BUILDPATH)/$(PROJECT).sym
 help:
 	@echo
 	@echo 'Targets'
-	@echo -e '\t- all: Patch BASIC 1.1 ROM with CH376 support'
+	@echo -e '\t- all: Patch BASIC 1.x ROM with CH376 support'
 	@echo
 	@echo -e '\t- symbols: Create symbols file for use with Oricutron'
 	@echo
 	@echo "NOTE: need $(AS) assembler, python"
-	@echo -e '\n'
+	@echo
 
+
+#
+#
+#
 
 configure:
 	@echo
 	@mkdir -p $(BUILDPATH)
-ifeq ($(OSDK_FOUND),)
-	@echo "Using official xa"
-else
-	@echo "OSDK found"
+	@mkdir -p $(OBJPATH)
+	@mkdir -p $(ROMPATH)
+	@mkdir -p $(INCPATH)
+	@echo "; Build $(ROM)" > $(INCPATH)/build.inc
+	@echo "; $(ASFLAGS)" >> $(INCPATH)/build.inc
+	@echo ".define COPYRIGHT_MSG \"$(COPYRIGHT_MSG)\"" | sed -re "s# /#/#g" >> $(INCPATH)/build.inc
+
+ifneq ($(CHROOT),)
+	@echo ".define ROOT_DIR \"$(CHROOT)\"" >> $(INCPATH)/build.inc
 endif
 
-clean:
-	cd $(BUILDPATH) && rm -f $(OBJ) $(LBL)
+ifneq ($(CHARSET),)
+	@echo ".define DEFAULT_CHARSET \"$(CHARSET)\"" >> $(INCPATH)/build.inc
+endif
+	@echo -e "\n$(OPTIONS)" >> $(INCPATH)/build.inc
 
+ifneq ($(PRAVETZT),)
+	@echo "option PRAVETZT, yes" >> $(INCPATH)/build.inc
+endif
+
+
+#
+#
+#
+
+clean:
+	cd $(OBJPATH) && rm -f $(OBJ) $(LBL)
+
+
+#
+#
+#
 
 mrproper: clean
-	cd $(BUILDPATH) && rm -f $(ROM) $(SYM)
+	cd $(ROMPATH) && rm -f $(ROM) $(SYM)

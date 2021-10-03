@@ -2,7 +2,7 @@
 all: cart symbols
 
 
-.PHONY: configure cart docs clean mrproper
+.PHONY: configure cart docs help clean mrproper
 
 configure:
 	@$(MAKE) -s -C src $@
@@ -15,6 +15,9 @@ symbols:
 
 #docs:
 #	@$(MAKE) -C docs
+
+help:
+	@$(MAKE) -s -C src help
 
 test:
 	@echo "Do some tests"
