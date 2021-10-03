@@ -102,6 +102,16 @@ jobs:
           echo "::set-output name=VERSION::$(cat VERSION)"
           echo "::set-output name=REPO_NAME::${GITHUB_REPOSITORY##*/}"
 
+      - name: Get branch name
+        if: github.event_name != 'pull_request'
+        run: echo "GIT_BRANCH=${GITHUB_REF##*/}" >> $GITHUB_ENV
+       # run: echo "::set-env name=GIT_BRANCH::$(echo ${GITHUB_REF##*/})"
+
+      - name: Get branch name on pull request
+        if: github.event_name == 'pull_request'
+        run: echo "GIT_BRANCH=${GITHUB_HEAD_REF}" >> GITHUB_ENV
+       #run: echo "::set-env name=GIT_BRANCH::$(echo ${GITHUB_HEAD_REF})"
+
       - name: Install sdk
         uses: actions/cache@v2
         with:
