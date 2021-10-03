@@ -115,79 +115,80 @@ jobs:
       - name: Prepare environment for project
         run: mv cc65 ../ && mv orix-software ../ && mv orix-sdk ../ && mv md2hlp ../
 
-      - name: Compile Atmos roms
+      - name: Compile Atmos Hobbit - sdcard (id=0)
         run: |
-          echo "Atmos roms (sdcard)"
-          echo "::group::Hobbit (id=0)"
           HOBBIT=yes make && make clean
-          echo "::endgroup::"
-          echo "::group::Games (id=1)"
+
+      - name: Compile Atmos Games - sdcard (id=1)
+        run: |
           GAMES=yes CHROOT=/HOME/BASIC11 make && make clean
-          echo "::endgroup::"
-          echo "::group::Normal (id=2)"
+
+      - name: Compile Atmos Normal - sdcard (id=2)
+        run: |
           make && make clean
-          echo "::endgroup::"
-          echo "::group::version 1.22 (id=3)"
+
+      - name: Compile Atmos v1.22 - sdcard (id=3)
+        run: |
           ROM122=yes make && make clean
-          echo "::endgroup::"
-          echo "Atmos roms (USB)"
-          echo "::group::Hobbit (id=0)"
+
+      - name: Compile Atmos Hobbit - USB (id=0)
+        run: |
           USB_MODE=usb HOBBIT=yes make && make clean
-          echo "::endgroup::"
-          echo "::group::Games (id=1)"
+
+      - name: Compile Atmos Games - USB (id=1)
+        run: |
           USB_MODE=usb GAMES=yes CHROOT=/HOME/BASIC11 make && make clean
-          echo "::endgroup::"
-          echo "::group::Normal (id=2)"
+
+      - name: Compile Atmos Normal - USB (id=2)
+        run: |
           USB_MODE=usb make && make clean
-          echo "::endgroup::"
-          echo "::group::version 1.22 (id=3)"
+
+      - name: Compile Atmos v1.22 - USB (id=3)
+        run: |
           USB_MODE=usb ROM122=yes make && make clean
-          echo "::endgroup::"
 
-      - name: Compile Oric-1 roms
+      - name: Compile Oric-1 Normal - sdcard (id=2)
         run: |
-          echo "Oric-1 roms (sdcard)"
-          echo "::group::Normal (id=2)"
           VERSION=100 make && VERSION=100 make clean
-          echo "::endgroup::"
-          echo "Oric-1 roms (USB)"
-          echo "::group::Normal (id=2)"
-          USB_MODE=usb VERSION=100 make && VERSION=100 make clean
-          echo "::endgroup::"
 
-      - name: Compile Pravetzt roms
+      - name: Compile Oric-1 Normal - USB (id=2)
         run: |
-          echo "Pravetzt roms (sdcard)"
-          echo "::group::Hobbit (id=0)"
-          HOBBIT=yes PRAVETZT=yes make && make clean
-          echo "::endgroup::"
-          echo "::group::Games (id=1)"
-          GAMES=yes PRAVETZT=yes CHROOT=/HOME/PRAVETZT make && make clean
-          echo "::endgroup::"
-          echo "::group::Normal (id=2)"
-          PRAVETZT=yes make && make clean
-          echo "::endgroup::"
+          USB_MODE=usb VERSION=100 make && VERSION=100 make clean
 
-      - name: Compile Pravetzt v1.22 (sdcard)
+      - name: Compile Pravetzt Hobbit - sdcard (id=0)
+        run: |
+          HOBBIT=yes PRAVETZT=yes make && make clean
+
+      - name: Compile Pravetzt Games - sdcard (id=1)
+        run: |
+          GAMES=yes PRAVETZT=yes CHROOT=/HOME/PRAVETZT make && make clean
+
+      - name: Compile Pravetzt Normal - sdcard (id=2)
+        run: |
+          PRAVETZT=yes make && make clean
+
+      - name: Compile Pravetzt v1.22 - sdcard (id=3)
         run: |
           ROM122=yes PRAVETZT=yes make && make clean
 
-      - name: Compile Pravetzt Hobbit (USB)
+      - name: Compile Pravetzt Hobbit - USB (id=0)
         run: |
-          echo "Pravetzt roms (USB)"
-          echo "::group::Hobbit (id=0)"
           USB_MODE=usb HOBBIT=yes PRAVETZT=yes make && make clean
-          echo "::endgroup::"
-          echo "::group::Games (id=1)"
+
+      - name: Compile Pravetzt Games - USB (id=1)
+        run: |
           USB_MODE=usb GAMES=yes PRAVETZT=yes CHROOT=/HOME/PRAVETZT make && make clean
-          echo "::endgroup::"
-          echo "::group::Normal (id=2)"
+
+      - name: Compile Pravetzt Normal - USB (id=2)
+        run: |
           USB_MODE=usb PRAVETZT=yes make && make clean
-          echo "::endgroup::"
-          echo "::group::version 1.22 (id=3)"
+
+      - name: Compile Pravetzt v1.22 - USB (id=3)
+        run: |
           USB_MODE=usb ROM122=yes PRAVETZT=yes make && make clean
-          echo "::endgroup::"
-          mkdir build/charset && cp src/charset/*CHS build/charset
+
+      - name: Add charset files
+        run: mkdir build/charset && cp src/charset/*CHS build/charset
 
       - name: List build directory content
         run: ls -lR build

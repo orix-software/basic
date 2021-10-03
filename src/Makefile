@@ -89,7 +89,7 @@ else
 	ifeq ($(PRAVETZT),)
 		BUILD_DATE := $(shell date +" %d/%m %H:%M")
 	else
-		BUILD_DATE := $(shell date +" %d/%m %H%M")
+		BUILD_DATE := $(shell date +" %d/%m")
 	endif
 endif
 
