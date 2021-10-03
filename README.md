@@ -1,15 +1,16 @@
 [![build](https://github.com/orix-software/basic/actions/workflows/main.yml/badge.svg)](https://github.com/orix-software/basic/actions/workflows/main.yml)
 
 # Description
-BASIC cartridge for Orix with ch376 support
+BASIC cartridges for Orix with ch376 support
 
-- Based on BASIC v1.1 (Atmos version)
+- Based on BASIC v1.1 (Atmos and Pravetzt version), BASIC v1.0 (Oric-1 version)
 - Patch CSAVE/CLOAD/STORE/RECALL to use ch376 instead of tapes
+- Add QUIT instruction to go back to Orix
 
 ## Directories
 - docs: Documentation
 - src : Source files
-- original: Original ROM image
+- original: Original ROM images
 
 ## Informations (french)
 

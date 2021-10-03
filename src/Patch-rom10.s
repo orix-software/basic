@@ -543,6 +543,323 @@ MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams 
                 LE70E:
                 assert_address "ReadUSBData", $E70E
 
+
+;---------------------------------------------------------------------------
+;				CSAVE
+;---------------------------------------------------------------------------
+	;---------------------------------------------------------------------------
+	; Patch routine existante: détournement vers OpenTapeWrite qui repassera
+	; ensuite en $E60A
+	; Sinon, il faut modifier les routines qui appelle WriteFileHeader pour
+	; qu'elles appellent OpenTapeWrite
+	;
+	; MIEUX: modifier WriteLeader pour appeler OpenTapeWrite
+	;---------------------------------------------------------------------------
+	new_patchl WriteFileHeader, 3
+
+		;WriteFileHeader:
+			jsr OpenTapeWrite
+
+	;---------------------------------------------------------------------------
+	; 14 Octets
+	;---------------------------------------------------------------------------
+	new_patch PutTapeByte, LE630
+
+		;PutTapeByte:
+		.scope
+			; Doit conserver X et Y
+			; A voir si la modification de $2f ne perturbe pas
+			; les programmes de jeux
+		        sta     $2F                             ; E6F9 A5 2F
+		        tya                                     ; E6C9 98
+		        pha                                     ; E6CA 48
+		        txa                                     ; E6CB 8A
+		        pha                                     ; E6CC 48
+
+			; On écrit 1 caractère
+			jsr 	WriteUSBData3			; Ecrit un caractère, résultat dans $2f
+;			bcs	fin_erreur
+;		fin_erreur:
+;			message d'erreur?
+		fin:
+		        pla                                     ; E6F5 68
+		        tax                                     ; E6F6 AA
+		        pla                                     ; E6F7 68
+		        tay                                     ; E6F8 A8
+		        rts                                     ; E6FB 60
+		.endscope
+
+		;---------------------------------------------------------------------------
+		; 6 Octets
+		;---------------------------------------------------------------------------
+		; Sauvegarde de l'entête
+		OpenTapeWrite:
+		.scope
+			;lda #<TAPE_SNAME			; Forcé dans SetFilename2
+			;ldy #>TAPE_SNAME
+	.if ::MULTIPART_SAVE
+			lda	OPENFFLAG		; Fichier déjà ouvert?
+			bne	_open_file		; Non -> il faut en ouvrir un
+			lda	TAPE_SNAME		; Nom du fichier commence par '+'?
+			cmp	#'+'
+			beq	*+5			; Oui -> mode multipart
+		_open_file:
+	.endif
+			jsr	OpenForWrite
+			jmp	WriteLeader
+;			jsr	WriteLeader
+;			jmp	WriteFileHeader+3	; Retour à la routine $E607 pour sauvegarde de l'entête
+		.endscope
+
+		;---------------------------------------------------------------------------
+		; 29 Octets
+		;---------------------------------------------------------------------------
+		; Ecrit un octet sur la bande
+                WriteUSBData3:
+                .scope
+			; On écrit 1 caractère
+			lda	#$01
+			ldy	#$00
+			jsr	SetByteWrite
+			cmp	#INT_DISK_WRITE			; /!\ Test par rapport à INT_SUCCESS mais SetByteWrite renvoie INT_DISK_WRITE si on écrit un seul octet
+			bne	fin_erreur
+
+                        lda     #CH376_CMD_WR_REQ_DATA		; WriteRqData
+                        sta     CH376_COMMAND
+			lda	CH376_DATA			; Nombre de caractère à écrire
+                        lda     $2f				; Caractère à écrire
+                        sta     CH376_DATA
+			jsr     ByteWrGo			; Nécessaire en réel, sinon le CH376 boucle sur son buffer
+			clc					; Indique pas d'erreur d'écriture
+			.byte $24
+		fin_erreur:
+			sec
+                        rts
+		.endscope
+
+.if 0
+; 24 octets
+		-PutTapeData:
+		.scope
+			jsr	SetByteReadWrite+2
+			bne	_PutTapeData_error
+
+			; Inutile si on vient de PutTapeData+10
+			;lda TAPE_START
+			;ldy TAPE_START+1
+			;sta INTTMP
+			;sty INTTMP+1
+
+			; Boucle de sauvegarde du bloc (18 octets)
+		loop:
+			; On peut supprimer les lda/ldy si on supprime les sta/sty de WriteUSBData
+			;lda INTTMP
+			;ldy INTTMP+1
+			jsr WriteUSBData
+
+			;clc
+			;bcs WriteNextChunk
+			;cpy #$00		; Nombre d'octets écrits == 0?
+			;beq fin
+
+			; Ajuste le pointeur
+			clc
+			tya
+			adc INTTMP
+			sta INTTMP
+			bcc *+4
+			inc INTTMP+1
+
+		WriteNextChunk:
+			jsr ByteWrGo
+			beq loop
+
+		fin:
+		_GetTapeData_error:
+			rts
+		.endscope
+
+; 22 octets
+		WriteUSBData:
+		.scope
+			; On peut supprimer les sta/sty si on supprime les lda/ldy de PutTapeData
+			; et que INTTMP est à jour avant l'appel
+		        ;sta INTTMP
+		        ;sty INTTMP+1
+
+		WriteUSBData2:
+		        ldy #0
+
+		        lda #CH376_CMD_WR_REQ_DATA	; WriteReqData
+		        sta CH376_COMMAND
+		        ldx CH376_DATA
+
+		        beq ZZZ002
+
+		ZZZ003:
+		        lda (INTTMP),Y
+		        sta CH376_DATA
+		        iny
+		        dex
+		        bne ZZZ003
+
+		ZZZ002:
+		        rts
+		.endscope
+.endif
+
+
+		; 9 octets - Inutile pour le moment
+;		WriteRqData:
+;			lda	#CH376_CMD_WR_REQ_DATA	; WriteReqData
+;			sta	CH376_COMMAND
+;			lda	CH376_DATA
+;			rts
+
+		;---------------------------------------------------------------------------
+		; 26 Octets - Calcul du nombre d'octets à écrire dans le fichier
+		;---------------------------------------------------------------------------
+		; 11 Octets
+		;	lda	TAPE_END
+		;	ldy	TAPE_END+1
+		;	bit	TAPE_TYPE			; Commande STORE?
+		;	bvs	Fin			; Oui -> pas de calcul de la taille, c'est déjà fait
+
+			; Optimisé (10+5)
+		;	sec				; Calcule la taille du programme
+			;lda	TAPE_END			; Déjà fait
+		;	sbc	TAPE_START
+		;	tax
+
+			;lda	TAPE_END+1
+		;	tya
+		;	sbc	TAPE_START+1
+		;	tay
+
+		;	inx				; +1
+		;	bne	*+3
+		;	iny
+
+		;	txa
+		;Fin
+
+		;E6B0
+		;---------------------------------------------------------------------------
+		; WaitResponse:
+		; A voir si il faut preserver X et Y
+		;
+		; Entree:
+		;
+		; Sortie:
+		; Z: 0 -> ACC: Status du CH376
+		; Z: 1 -> Timeout
+		; X,Y: Modifies
+		;---------------------------------------------------------------------------
+		; 25 Octets
+		;---------------------------------------------------------------------------
+		; Transféré dans charset.inc
+		;---------------------------------------------------------------------------
+.if 0
+		WaitResponse:
+		.scope
+			ldy	#$ff
+		ZZZ009:
+			ldx	#$ff
+		ZZZ010:
+			lda	CH376_COMMAND
+			bmi	ZZZ011
+			lda	#CH376_CMD_GET_STATUS
+			sta	CH376_COMMAND
+			lda	CH376_DATA
+			rts
+		ZZZ011:
+			dex
+			bne	ZZZ010
+			dey
+			bne	ZZZ009
+			rts
+		.endscope
+
+		;---------------------------------------------------------------------------
+		; Version sans Timeout: 14 Octets
+		;---------------------------------------------------------------------------
+		;										; REPEAT;
+		;ZZZ010
+		;										; .A = CH376_COMMAND;
+		;	lda	CH376_COMMAND
+		;										; UNTIL -;
+		;	bpl	zzz010
+		;										; CH376_COMMAND = $22;
+		;	lda	#CH376_CMD_GET_STATUS
+		;	sta	CH376_COMMAND
+		;										; .A = CH376_DATA;
+		;	lda	CH376_DATA
+		;										; RETURN;
+		;	rts
+
+	CloadMultiPart:
+			jsr	MultiPart
+			jmp	GetTapeParams
+	RecallMultiPart:
+			jsr	MultiPart
+			jmp	GetStoreRecallParams
+.endif
+
+;.ifndef FORCE_ROOT_DIR
+;	load_charset2:
+;		jsr	load_charset
+;		jmp	FileClose
+;.endif
+	; Actuellement: $E6C6 si MULTIPART_SAVE, $E6BC sinon
+
+
+		;---------------------------------------------------------------------------
+		; 11 Octets
+		;---------------------------------------------------------------------------
+		; Fermeture du fichier après sauvegarde
+		;---------------------------------------------------------------------------
+	.if .not MULTIPART_SAVE
+		WriteClose:
+			lda #$01			; Fermeture avec mise à jour
+			sta OPENFFLAG			; Indique fichier fermé
+			jsr FileClose
+			jmp LE804
+	.endif
+
+
+		;---------------------------------------------------------------------------
+		; OpenForWrite ( 6 octets)
+		;---------------------------------------------------------------------------
+		; Ouvre un fichier en écriture
+		;
+		; Entree:
+		;	-
+		;
+		; Sortie:
+		;	A: Code de retour du CH376
+		;
+		; Modifie:
+		;	OPENFFLAG: Flag fichier ouvert
+		;
+		; Utilise:
+		;	-
+		; Sous-routines:
+		;	CloseOpenedFile
+		;	FileCreate
+		;---------------------------------------------------------------------------
+		; $fdd3: 'K' -> 'L'
+		; $ff61: '}' -> '}' (Hobbit)
+		OpenForWrite:
+		.scope
+			jsr CloseOpenedFile
+			;jsr SetFilename2
+			jmp	FileCreate
+		.endscope
+
+	LE630:
+                assert_address "PutTapeByte", $E630
+
+
 ; ============================================================================
 ; charset.inc
 ; ============================================================================
