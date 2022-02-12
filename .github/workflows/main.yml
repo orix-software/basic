@@ -270,16 +270,26 @@ jobs:
           echo "Basicusb Games v$version joy/usb;/usr/share/basic/$version/basicus1.rom" >> orix/etc/orixcfg/$version/basic.cnf
           echo "Basicusb v$version joy/usb;/usr/share/basic/$version/basicus2.rom" >> orix/etc/orixcfg/$version/basic.cnf
           echo "Generating for loader"
-          echo "[Atmos (Hobbit v$version/sdcard)]\npath=/usr/share/basic11/$version/basicsd0.rom" > orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Atmos (Games v$version joy/sdcard)]\npath=/usr/share/basic11/$version/basicsd1.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Atmos (v$version joy/sdcard)]\npath=/usr/share/basic11/$version/basicsd2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Atmos (Hobbit v$version usb)]\npath=/usr/share/basic11/$version/basicus0.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Atmos (Games v$version joy/usb)]\npath=/usr/share/basic11/$version/basicus1.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Atmos (v$version joy/usb)]\npath=/usr/share/basic11/$version/basicus2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Oric-1 (v$version joy/sdcard)]\npath=/usr/share/basic10/$version/basicsd2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Oric-1 (v$version joy/usb)]\npath=/usr/share/basic10/$version/basicus2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Pravetz (v$version joy/sdcard)]\npath=/usr/share/pravetzt/$version/pravsd2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
-          echo "[Pravetz (v$version joy/usb)]\npath=/usr/share/pravetzt/$version/pravus2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Atmos (Hobbit v$version/sdcard)]"  > orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic11/$version/basicsd0.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Atmos (Games v$version joy/sdcard)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic11/$version/basicsd1.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Atmos (v$version joy/sdcard)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic11/$version/basicsd2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Atmos (Hobbit v$version usb)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic11/$version/basicus0.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Atmos (Games v$version joy/usb)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic11/$version/basicus1.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Atmos (v$version joy/usb)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic11/$version/basicus2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Oric-1 (v$version joy/sdcard)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic10/$version/basicsd2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Oric-1 (v$version joy/usb)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/basic10/$version/basicus2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Pravetz (v$version joy/sdcard)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/pravetzt/$version/pravsd2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "[Pravetz (v$version joy/usb)]" >> orix/etc/systemd/basic/$version/basic.cnf
+          echo "path=/usr/share/pravetzt/$version/pravus2.rom" >> orix/etc/systemd/basic/$version/basic.cnf
           cd orix && tar -zcvf $GITHUB_WORKSPACE/$ARCHIVE_NAME *
 
       - name: Upload to oric
