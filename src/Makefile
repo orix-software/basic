@@ -62,22 +62,33 @@ ifeq ($(VERSION),100)
 	GAMES = no
 	PATCHROM := ../original/basic10
 	SRC = Patch-rom10.s
+	ORIX_CFG = "Oric-1 ("
 else
 	ifneq ($(PRAVETZT),)
 		PATCHROM := ../original/pravetzt
+		ORIX_CFG = "Pravetzt ("
 	else
 		PATCHROM := ../original/basic11b
+		ORIX_CFG = "Atmos ("
 	endif
 	SRC = Patch-rom11.s
 endif
 
 
 ifneq ($(PRAVETZT),)
-	VERSION = 110
-	ROMPATH := $(BUILDPATH)/pravetzt
+	VERSION=110
+	ROMPATH=$(BUILDPATH)/pravetzt
+else
+	ifeq ($(VERSION),100)
+		ROMPATH=$(BUILDPATH)/oric1
+	else
+	ROMPATH=$(BUILDPATH)/atmos
+	endif
 endif
 
-ROMPATH := $(ROMPATH).$(VERSION)
+ifeq ($(ROM122),yes)
+	ORIX_CFG += "1.2"
+endif
 
 #
 # Définition de la date du build
@@ -87,9 +98,9 @@ ifeq ($(GIT_BRANCH),master)
 	BUILD_DATE :=
 else
 	ifeq ($(PRAVETZT),)
-		BUILD_DATE := $(shell date +" %d/%m %H:%M")
+		BUILD_DATE := $(shell date +" %m%d-%H%M")
 	else
-		BUILD_DATE := $(shell date +" %d/%m")
+		BUILD_DATE := $(shell date +" %m%d")
 	endif
 endif
 
@@ -110,6 +121,7 @@ ifeq ($(HOBBIT),yes)
 	ROMID := 0
 	JOYSTICK = no
 	EXPERIMENTAL = no
+	ORIX_CFG += "Hobbit"
 else
 	ifeq ($(GAMES),yes)
 		ifeq ($(PRAVETZT),)
@@ -122,6 +134,7 @@ else
 		ROMID := 1
 		JOYSTICK = yes
 		EXPERIMENTAL = no
+		ORIX_CFG += "Games"
 	else
 		ifeq ($(ROM122),yes)
 			ifeq ($(PRAVETZT),)
@@ -148,33 +161,36 @@ else
 endif
 
 OPTIONS += "CONFIG .set $(ROMID)\\n"
-
+ORIX_CFG += "v$(PROJECT_VERSION)"
 
 #
-# Sélection du type de carte (usb_host / sdcard)
+# Sélection du type de carte (usb_host / sdcard / auto)
 #
 
 ifeq ($(USB_MODE),sdcard)
-	ifeq ($(PRAVETZT),)
-		PROJECT = basicsd$(ROMID)
-	else
-		PROJECT = pravsd$(ROMID)
-	endif
+	PROJECT = basicsd$(ROMID)
 
 	COPYRIGHT_MSG_AUTO += "SD"
 	OPTIONS += "CH376_USB_MODE .set SDCARD_MODE\\n"
+	ORIX_CFG += "sdcard"
 
 else
-	ifeq ($(PRAVETZT),)
+	ifeq ($(USB_MODE),usb)
 		PROJECT = basicus$(ROMID)
+
+		COPYRIGHT_MSG_AUTO += "USB"
+		OPTIONS += "CH376_USB_MODE .set USB_HOST_MODE\\n"
+		ORIX_CFG += "usb"
+
 	else
-		PROJECT = pravus$(ROMID)
+		PROJECT = basicxx$(ROMID)
+
+		COPYRIGHT_MSG_AUTO += "AUTO"
+		OPTIONS += "option AUTO_USB_MODE, yes\\n"
+		ORIX_CFG += "auto"
+
 	endif
-
-	COPYRIGHT_MSG_AUTO += "USB"
-	OPTIONS += "CH376_USB_MODE .set USB_HOST_MODE\\n"
 endif
-
 
 #
 # Personnalisations diverses
@@ -192,6 +208,7 @@ endif
 ifeq ($(JOYSTICK),yes)
 	COPYRIGHT_MSG_AUTO += "/JOY"
 	OPTIONS += "option JOYSTICK_DRIVER, yes\\n"
+	ORIX_CFG += "/joy"
 endif
 
 
@@ -231,6 +248,8 @@ ifneq ($(CHROOT),)
 	CHROOT :=  $(shell echo $(CHROOT) | tr a-z A-Z)
 endif
 
+ORIX_CFG +=");$(ROMPATH)/$(PROJECT_VERSION)/$(ROM)"
+
 #
 # Règles Make
 #
@@ -255,6 +274,7 @@ $(ROMPATH)/$(ROM): $(OBJPATH)/$(OBJ)
 	@echo
 	@echo "Create $(ROM) - $(COPYRIGHT_MSG)" |sed -re "s# /#/#g"
 	@$(PATCH) --rom $(PATCHROM).rom -p $< -o $@
+	@echo $(ORIX_CFG) | sed -re "s# /#/#g" >> $(BUILDPATH)/basic.cnf
 
 
 %.sym: %.lbl

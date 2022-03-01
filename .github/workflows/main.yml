@@ -125,6 +125,7 @@ jobs:
       - name: Prepare environment for project
         run: mv cc65 ../ && mv orix-software ../ && mv orix-sdk ../ && mv md2hlp ../
 
+      # Atmos - SD
       - name: Compile Atmos Hobbit - sdcard (id=0)
         run: |
           HOBBIT=yes make && make clean
@@ -141,6 +142,7 @@ jobs:
         run: |
           ROM122=yes make && make clean
 
+      # Atmos - USB
       - name: Compile Atmos Hobbit - USB (id=0)
         run: |
           USB_MODE=usb HOBBIT=yes make && make clean
@@ -157,14 +159,31 @@ jobs:
         run: |
           USB_MODE=usb ROM122=yes make && make clean
 
+      # Atmos - AUTO
+      - name: Compile Atmos Normal - Auto (id=2)
+        run: |
+          USB_MODE=auto make && make clean
+
+      - name: Compile Atmos v1.22 - Auto (id=3)
+        run: |
+          USB_MODE=auto ROM122=yes make && make clean
+
+      # Oric-1 - SD
       - name: Compile Oric-1 Normal - sdcard (id=2)
         run: |
           VERSION=100 make && VERSION=100 make clean
 
+      # Oric-1 - USB
       - name: Compile Oric-1 Normal - USB (id=2)
         run: |
           USB_MODE=usb VERSION=100 make && VERSION=100 make clean
 
+      # Oric-1 - AUTO
+      - name: Compile Oric-1 Normal - Auto (id=2)
+        run: |
+          USB_MODE=auto VERSION=100 make && VERSION=100 make clean
+
+      # Pravetzt - SD
       - name: Compile Pravetzt Hobbit - sdcard (id=0)
         run: |
           HOBBIT=yes PRAVETZT=yes make && make clean
@@ -181,6 +200,7 @@ jobs:
         run: |
           ROM122=yes PRAVETZT=yes make && make clean
 
+      # Pravetzt - USB
       - name: Compile Pravetzt Hobbit - USB (id=0)
         run: |
           USB_MODE=usb HOBBIT=yes PRAVETZT=yes make && make clean
@@ -196,6 +216,15 @@ jobs:
       - name: Compile Pravetzt v1.22 - USB (id=3)
         run: |
           USB_MODE=usb ROM122=yes PRAVETZT=yes make && make clean
+
+      # Pravetzt - AUTO
+      - name: Compile Pravetzt Normal - Auto (id=2)
+        run: |
+          USB_MODE=auto PRAVETZT=yes make && PRAVETZT=yes make clean
+
+      - name: Compile Pravetzt v1.22 - Auto (id=3)
+        run: |
+          USB_MODE=auto ROM122=yes PRAVETZT=yes make && PRAVETZT=yes make clean
 
       - name: Add charset files
         run: mkdir build/charset && cp src/charset/*CHS build/charset
@@ -251,23 +280,20 @@ jobs:
         working-directory: ${{steps.download.outputs.download-path}}
         run: |
           mkdir -p orix/etc/orixcfg/$version
-          mkdir -p orix/usr/share/basic11/$version
-          mkdir -p orix/usr/share/basic10/$version
+          mkdir -p orix/etc/systemd/basic/$version/
+          mkdir -p orix/usr/share/oric1/$version
+          mkdir -p orix/usr/share/atmos/$version
           mkdir -p orix/usr/share/pravetzt/$version
           mkdir -p orix/usr/share/fonts
-          cp rom.110/*.rom orix/usr/share/basic11
-          cp rom.110/*.rom orix/usr/share/basic11/$version
-          cp rom.100/*.rom orix/usr/share/basic10
-          cp rom.100/*.rom orix/usr/share/basic10/$version
-          cp pravetzt.110/*.rom orix/usr/share/pravetzt
-          cp pravetzt.110/*.rom orix/usr/share/pravetzt/$version
+          cp oric1/*.rom orix/usr/share/oric1
+          cp oric1/*.rom orix/usr/share/oric1/$version
+          cp atmos/*.rom orix/usr/share/atmos
+          cp atmos/*.rom orix/usr/share/atmos/$version
+          cp pravetzt/*.rom orix/usr/share/pravetzt
+          cp pravetzt/*.rom orix/usr/share/pravetzt/$version
           cp charset/* orix/usr/share/fonts
-          echo "Basicsd Hobbit v$version sd;/usr/share/basic/$version/basicsd0.rom" > orix/etc/orixcfg/$version/basic.cnf
-          echo "Basicsd Games v$version joy/sd;/usr/share/basic/$version/basicsd1.rom" >> orix/etc/orixcfg/$version/basic.cnf
-          echo "Basicsd v$version joy/sd;/usr/share/basic/$version/basicsd2.rom" >> orix/etc/orixcfg/$version/basic.cnf
-          echo "Basicusb Hobbit v$version usb;/usr/share/basic/$version/basicus0.rom" >> orix/etc/orixcfg/$version/basic.cnf
-          echo "Basicusb Games v$version joy/usb;/usr/share/basic/$version/basicus1.rom" >> orix/etc/orixcfg/$version/basic.cnf
-          echo "Basicusb v$version joy/usb;/usr/share/basic/$version/basicus2.rom" >> orix/etc/orixcfg/$version/basic.cnf
+          sed -re 's#^(.+);.+/build/(.+)$#\1;/usr/share/\2#' basic.cnf > orix/etc/orixcfg/$version/basic.cnf
+          sed -re 's#^(.+);.+/build/(.+)$#[\1]\npath=/usr/share/\2#' basic.cnf > orix/etc/systemd/basic/$version/basic.cnf
           cd orix && tar -zcvf $GITHUB_WORKSPACE/$ARCHIVE_NAME *
 
       - name: Upload to oric

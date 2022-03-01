@@ -77,9 +77,9 @@ MULTIPFLAG	= $0267			; Flag pour Multipart (0: Fichier ouvert, 1: GetTapeParams 
 		Copyright:
 			.byte COPYRIGHT_MSG
 
-        assert_address "COPYRIGHT_MSG", $EB7D
+        assert_address "COPYRIGHT_MSG", $EB7C
 
-			.res $EB7E-*,$00
+			.res $EB7D-*,$00
 	LEB7E:
 
 

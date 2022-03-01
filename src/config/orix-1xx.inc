@@ -35,6 +35,23 @@
 
 	option PRAVETZT, OFF
 
+        option AUTO_USB_MODE, OFF
+        option MULTIPART_SAVE, OFF
+        option SET_CHROOT, ON
+
+        ; Si la carte contient un vrai 6522
+        option VIA2_6522, OFF
+        ; Si la carte contient juste le  minimum
+        option VIA2_FAKE, ON
+
+
+        option NO_CHARSET, SET
+        option ORIX_CLI, SET
+        option LOAD_CHARSET, SET
+        option ORIX_SIGNATURE, SET
+
+        option FORCE_ROOT_DIR, SET
+
 .include "build.inc"
 
 ;---------------------------------------------------------------------------
@@ -125,23 +142,21 @@
 	;---------------------------------------------------------------------------
 	;				Défaut
 	;---------------------------------------------------------------------------
-option NO_CHARSET, SET
-option ORIX_CLI, SET
-option LOAD_CHARSET, SET
-option ORIX_SIGNATURE, SET
-
-option FORCE_ROOT_DIR, SET
 
 .if .not GAMES
 	.if .not .match(ROOT_DIR, "ROOT_DIR")
 		.if VERSION = 100
 			.define ROOT_DIR "/HOME/BASIC10"
 		.else
-			.if PRAVETZT = 0
-				.define ROOT_DIR "/HOME/BASIC11"
-			.else
-				.define ROOT_DIR "/HOME/PRAVETZT"
-			.endif
+                        .if .not ROM_122
+			        .if PRAVETZT = 0
+				        .define ROOT_DIR "/HOME/BASIC11"
+			        .else
+				        .define ROOT_DIR "/HOME/PRAVETZT"
+			        .endif
+	                .else
+			        .define ROOT_DIR "/HOME/BASIC12"
+		        .endif
 		.endif
 	.endif
 .endif
@@ -153,14 +168,6 @@ option FORCE_ROOT_DIR, SET
 	option JOYSTICK_DEFAULT_CONF, OFF
 .endif
 
-option AUTO_USB_MODE, OFF
-option MULTIPART_SAVE, OFF
-option SET_CHROOT, SET
-
-; Si la carte contient un vrai 6522
-option VIA2_6522, OFF
-; Si la carte contient juste le  minimum
-option VIA2_FAKE, SET
 
 
 	;---------------------------------------------------------------------------
@@ -189,6 +196,7 @@ option VIA2_FAKE, SET
 
 	; Cyclotron modifie l'octet en $99, donc on doit forcer le mode du CH376
 	;.undef AUTO_USB_MODE
+        option AUTO_USB_MODE, OFF
 
 	option JOYSTICK_EXTERNAL_CONF, SET
 

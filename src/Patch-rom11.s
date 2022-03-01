@@ -2287,15 +2287,13 @@
 	; Message de Copyright
 	;---------------------------------------------------------------------------
 	new_patch $ed96,LEDC4
-		; Maxi 44 octets
+		; Maxi 45 octets
 		Copyright:
 			.byte COPYRIGHT_MSG
 
-.if * > $EDC3
-	.error .sprintf("*** ERROR 'COPYRIGHT_MSG' too long: $%X", *)
-.endif
+	assert_address "COPYRIGHT_MSG", $EDC2
 
-			.res $EDC4-*,$00
+			.res $EDC3-*,$00
 	LEDC4:
 
 
