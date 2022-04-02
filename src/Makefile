@@ -274,7 +274,7 @@ $(ROMPATH)/$(ROM): $(OBJPATH)/$(OBJ)
 	@echo
 	@echo "Create $(ROM) - $(COPYRIGHT_MSG)" |sed -re "s# /#/#g"
 	@$(PATCH) --rom $(PATCHROM).rom -p $< -o $@
-	@echo $(ORIX_CFG) | sed -re "s# /#/#g" >> $(BUILDPATH)/basic.cnf
+	@echo $(ORIX_CFG) | sed -re "s# /#/#g; s/\( /(/; s/ \)/)/" >> $(BUILDPATH)/basic.cnf
 
 
 %.sym: %.lbl
