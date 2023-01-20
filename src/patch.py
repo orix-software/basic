@@ -22,7 +22,7 @@ import struct
 __program_name__ = 'patch'
 __description__ = "Patch ROM file"
 __plugin_type__ = 'TOOL'
-__version__ = '0.2'
+__version__ = '0.3'
 
 # ------------------------------------------------------------------------------
 
@@ -111,12 +111,16 @@ def main():
     rom = load_rom(args.rom)
     rom = patch_rom(args.patch, rom, int(args.base, 0))
 
-    rom = ''.join(map(chr, rom))
+    # rom = ''.join(map(chr, rom))
     if args.output is None:
+        rom = ''.join(map(chr, rom))
         print(rom, end='')
     else:
         with open(args.output, 'wb') as fd:
-            fd.write(rom)
+            if sys.version_info.major < 3:
+                fd.write(rom)
+            else:
+                fd.write(bytes(rom))
 
 
 # -----------------------------------------------------------------------------
