@@ -200,6 +200,9 @@
 
 	option JOYSTICK_EXTERNAL_CONF, SET
 
+        ; Nécessaire au moins pour L'aigle d'or et Rat Splat
+        option FORCE_MULTIPART, ON
+
 .endif
 
 

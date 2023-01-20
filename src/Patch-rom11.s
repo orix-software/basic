@@ -412,8 +412,10 @@
 	;---------------------------------------------------------------------------
 	; Patch la détection multipart de certains jeux qui ne passe pas par CLOAD
 	;---------------------------------------------------------------------------
+.if .not FORCE_MULTIPART
 	new_patchl (CLOAD+1),3
 		jsr CloadMultiPart
+.endif
 
 	;---------------------------------------------------------------------------
 	; Patch la détection multipart de certains jeux qui ne passe pas par RECALL
@@ -908,6 +910,9 @@
 			lda	#$c0-$28
 			sta	MEMSIZ+1
 			sta	HIMEM_MAX+1
+.if FORCE_MULTIPART
+			sta	MULTIPFLAG
+.endif
 			rts
 
 .if ORIX_CLI

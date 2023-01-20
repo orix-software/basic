@@ -14,12 +14,12 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   setup-sdk:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Cache sdk
         id: cache-sdk
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
              cc65/**/*
@@ -83,7 +83,7 @@ jobs:
   build:
     # The type of runner that the job will run on
     needs: setup-sdk
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash
@@ -99,8 +99,8 @@ jobs:
       - name: Set job variables
         id: job_vars
         run: |
-          echo "::set-output name=VERSION::$(cat VERSION)"
-          echo "::set-output name=REPO_NAME::${GITHUB_REPOSITORY##*/}"
+          echo "VERSION=$(cat VERSION)" >> $GITHUB_OUTPUT
+          echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_OUTPUT
 
       - name: Get branch name
         if: github.event_name != 'pull_request'
@@ -113,7 +113,7 @@ jobs:
        #run: echo "::set-env name=GIT_BRANCH::$(echo ${GITHUB_HEAD_REF})"
 
       - name: Install sdk
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
              cc65/**/*
@@ -245,7 +245,7 @@ jobs:
 
   upload:
     needs: build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash
