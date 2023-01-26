@@ -2982,8 +2982,8 @@
 	; Modification pour la commande 'bank' de Orix
 	; qui fait un 'jmp $c000' et non un 'jmp ($fffc)
 	;---------------------------------------------------------------------------
-		new_patchl $c000,3
-				jmp	Reset
+;		new_patchl $c000,3
+;				jmp	Reset
 
 
 ;---------------------------------------------------------------------------
